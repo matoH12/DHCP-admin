@@ -267,6 +267,30 @@ class ApiService {
     const response = await this.api.put<Setting>(`/settings/${key}/`, data);
     return response.data;
   }
+
+  // ========== DHCP Logs ==========
+  async getDHCPLogs(params?: {
+    lines?: number;
+    search?: string;
+  }): Promise<any> {
+    const response = await this.api.get('/logs/dhcp', { params });
+    return response.data;
+  }
+
+  async clearDHCPLogs(): Promise<any> {
+    const response = await this.api.delete('/logs/clear');
+    return response.data;
+  }
+
+  async listLogFiles(): Promise<any[]> {
+    const response = await this.api.get('/logs/files');
+    return response.data;
+  }
+
+  async deleteLogFile(filename: string): Promise<any> {
+    const response = await this.api.delete(`/logs/file/${filename}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

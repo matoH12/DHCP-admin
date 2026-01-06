@@ -55,20 +55,10 @@ export function LogsPage() {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/v1/logs/dhcp?' + new URLSearchParams({
-        lines: '500',
+      const data = await apiService.getDHCPLogs({
+        lines: 500,
         ...(searchTerm && { search: searchTerm }),
-      }), {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to load logs');
-      }
-
-      const data: DHCPLogsResponse = await response.json();
       setLogsData(data);
     } catch (error) {
       message.error('Nepodarilo sa načítať DHCP logy');
@@ -97,17 +87,7 @@ export function LogsPage() {
       cancelText: 'Zrušiť',
       onOk: async () => {
         try {
-          const response = await fetch('/api/v1/logs/clear', {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to clear logs');
-          }
-
+          await apiService.clearDHCPLogs();
           message.success('Logy boli úspešne vymazané');
           loadLogs();
         } catch (error) {

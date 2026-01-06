@@ -23,13 +23,19 @@ class LogMonitor:
 
     def start(self):
         """Start monitoring log file in background thread"""
+        print(f"[LOG MONITOR] start() called, running={self.running}")
         if self.running:
+            print(f"[LOG MONITOR] Already running, skipping")
             return
+
+        if not os.path.exists(DHCP_LOG_FILE):
+            print(f"[LOG MONITOR] Warning: Log file {DHCP_LOG_FILE} does not exist yet")
 
         self.running = True
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.thread.start()
         print(f"✓ Log monitor started (checking every {CHECK_INTERVAL}s)")
+        print(f"[LOG MONITOR] Thread started: {self.thread.is_alive()}, daemon={self.thread.daemon}")
 
     def stop(self):
         """Stop monitoring"""
@@ -39,11 +45,14 @@ class LogMonitor:
 
     def _monitor_loop(self):
         """Main monitoring loop"""
+        print(f"[LOG MONITOR] Monitor loop started, will check every {CHECK_INTERVAL}s")
         while self.running:
             try:
                 self._check_log_file()
             except Exception as e:
                 print(f"[LOG MONITOR ERROR] {e}")
+                import traceback
+                traceback.print_exc()
 
             time.sleep(CHECK_INTERVAL)
 
@@ -69,6 +78,7 @@ class LogMonitor:
             if not new_lines:
                 return
 
+            print(f"[LOG MONITOR] Processing {len(new_lines)} new log lines")
             # Process new lines
             db = SessionLocal()
             try:
@@ -94,10 +104,17 @@ class LogMonitor:
         if not any(keyword in line for keyword in dhcp_keywords):
             return
 
+        print(f"[LOG MONITOR] Found DHCP activity: {line[:100]}")
+
         # Extract MAC address
         mac_address = extract_mac_from_dhcp_log(line)
         if mac_address:
-            update_device_last_seen(db, mac_address)
+            print(f"[LOG MONITOR] Extracted MAC: {mac_address}")
+            result = update_device_last_seen(db, mac_address)
+            if not result:
+                print(f"[LOG MONITOR] Device with MAC {mac_address} not found in database")
+        else:
+            print(f"[LOG MONITOR] Could not extract MAC from line")
 
 
 # Global monitor instance

@@ -98,3 +98,4 @@ nginx/ssl/*.crt
 
 # OS
 Thumbs.db
+dhcp-logs/*.log

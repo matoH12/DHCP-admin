@@ -64,7 +64,12 @@ def generate_dhcpd_conf(db: Session) -> str:
         output.append("# No active IP ranges configured")
         output.append("")
 
-    # Generate subnet declarations
+    # ========== PART 1: Subnet Declarations (without hosts) ==========
+    output.append("# ========================================")
+    output.append("# SUBNET DECLARATIONS")
+    output.append("# ========================================")
+    output.append("")
+
     for ip_range in ip_ranges:
         output.append(f"# Subnet: {ip_range.name}")
         if ip_range.description:
@@ -99,31 +104,43 @@ def generate_dhcpd_conf(db: Session) -> str:
         if ip_range.pool_start and ip_range.pool_end:
             output.append("    # Dynamic IP allocation pool")
             output.append(f"    range {ip_range.pool_start} {ip_range.pool_end};")
-            output.append("")
-
-        # Get all active devices in this range
-        devices = db.query(Device)\
-            .filter(Device.ip_range_id == ip_range.id)\
-            .filter(Device.is_active == True)\
-            .order_by(Device.hostname)\
-            .all()
-
-        if devices:
-            output.append("    # Static Host Reservations")
-            for device in devices:
-                output.append(f"    host {device.hostname} {{")
-                output.append(f"        hardware ethernet {device.mac_address};")
-                output.append(f"        fixed-address {device.ip_address};")
-                if device.description:
-                    # Add description as comment
-                    output.append(f"        # {device.description}")
-                output.append("    }")
-                output.append("")
         else:
-            output.append("    # No static reservations in this subnet")
-            output.append("")
+            output.append("    # No dynamic pool configured for this subnet")
 
         output.append("}")
+        output.append("")
+
+    # ========== PART 2: Global Host Declarations ==========
+    output.append("# ========================================")
+    output.append("# STATIC HOST RESERVATIONS (Global)")
+    output.append("# ========================================")
+    output.append("# Host declarations are global and not")
+    output.append("# limited to the subnet they're declared in")
+    output.append("")
+
+    # Get all active devices across all ranges
+    all_devices = db.query(Device)\
+        .filter(Device.is_active == True)\
+        .order_by(Device.hostname)\
+        .all()
+
+    if all_devices:
+        for device in all_devices:
+            # Get the IP range for context comment
+            ip_range = db.query(IPRange).filter(IPRange.id == device.ip_range_id).first()
+            range_name = ip_range.name if ip_range else "Unknown Range"
+
+            output.append(f"# {device.hostname} - {range_name}")
+            if device.description:
+                output.append(f"# {device.description}")
+
+            output.append(f"host {device.hostname} {{")
+            output.append(f"    hardware ethernet {device.mac_address};")
+            output.append(f"    fixed-address {device.ip_address};")
+            output.append("}")
+            output.append("")
+    else:
+        output.append("# No static host reservations configured")
         output.append("")
 
     # Footer

@@ -57,7 +57,7 @@ async def startup_event():
     """Initialize application on startup"""
     from .database import SessionLocal
     from .services.auth_service import create_admin_user_if_not_exists
-    from .services.syslog_server import start_syslog_server_thread
+    from .services.log_monitor import start_log_monitor
     from .services.cleanup_scheduler import start_cleanup_scheduler
 
     # Create database tables
@@ -77,8 +77,8 @@ async def startup_event():
     finally:
         db.close()
 
-    # Start syslog server
-    start_syslog_server_thread(host='0.0.0.0', port=514)
+    # Start log file monitor for device last_seen updates
+    start_log_monitor()
 
     # Start cleanup scheduler
     start_cleanup_scheduler()

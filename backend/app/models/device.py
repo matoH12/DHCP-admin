@@ -19,6 +19,7 @@ class Device(Base):
     ip_range_id = Column(Integer, ForeignKey("ip_ranges.id"), nullable=True)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    last_seen = Column(DateTime(timezone=True), nullable=True)  # Last DHCP activity
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)

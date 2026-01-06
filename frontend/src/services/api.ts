@@ -194,6 +194,27 @@ class ApiService {
     return response.data;
   }
 
+  async getActivityTimeline(days: number = 7): Promise<ActivityTimelineResponse> {
+    const response = await this.api.get<ActivityTimelineResponse>('/stats/device-activity-timeline', {
+      params: { days },
+    });
+    return response.data;
+  }
+
+  async getDHCPEvents(hours: number = 24): Promise<DHCPEventsResponse> {
+    const response = await this.api.get<DHCPEventsResponse>('/stats/dhcp-events', {
+      params: { hours },
+    });
+    return response.data;
+  }
+
+  async getTopActiveDevices(limit: number = 10, days: number = 7): Promise<TopActiveDevicesResponse> {
+    const response = await this.api.get<TopActiveDevicesResponse>('/stats/top-active-devices', {
+      params: { limit, days },
+    });
+    return response.data;
+  }
+
   // ========== User Management ==========
   async getUsers(): Promise<User[]> {
     const response = await this.api.get<User[]>('/users/');

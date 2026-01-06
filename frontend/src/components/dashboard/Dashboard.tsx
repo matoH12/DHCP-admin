@@ -9,6 +9,12 @@ import {
 import { apiService } from '../../services/api';
 import type { OverviewStatistics, RecentDevice } from '../../types/api';
 import dayjs from 'dayjs';
+import {
+  IPUtilizationBarChart,
+  DeviceActivityTimeline,
+  DHCPEventsPieChart,
+  TopActiveDevicesList
+} from './charts';
 
 const { Title } = Typography;
 
@@ -19,6 +25,9 @@ export function Dashboard() {
 
   useEffect(() => {
     loadData();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -183,7 +192,27 @@ export function Dashboard() {
         </Col>
       </Row>
 
+      <Title level={3} style={{ marginTop: 32 }}>Analytika a Grafy</Title>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={12}>
+          <IPUtilizationBarChart data={stats.ranges} loading={false} />
+        </Col>
+        <Col xs={24} lg={12}>
+          <DeviceActivityTimeline />
+        </Col>
+      </Row>
+
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={12}>
+          <DHCPEventsPieChart />
+        </Col>
+        <Col xs={24} lg={12}>
+          <TopActiveDevicesList />
+        </Col>
+      </Row>
+
+      <Title level={3} style={{ marginTop: 32 }}>Prehľady</Title>
+      <Row gutter={[16, 16]}>
         <Col xs={24}>
           <Card title="Využitie IP Rozsahov">
             <Table

@@ -194,3 +194,53 @@ export interface DHCPActivateResponse {
   generated_at: string;
   restart_status: string;
 }
+
+// ========== Analytics & Charts Types ==========
+
+export interface ActivityTimelinePoint {
+  date: string;
+  active_devices: number;
+  total_events: number;
+}
+
+export interface ActivityTimelineResponse {
+  data: ActivityTimelinePoint[];
+  days: number;
+  period_start: string;
+  period_end: string;
+}
+
+export interface DHCPEventData {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface DHCPEventsResponse {
+  data: DHCPEventData[];
+  total_events: number;
+  time_range_hours: number;
+}
+
+export interface TopActiveDevice {
+  device_id: number;
+  hostname: string;
+  ip_address: string;
+  mac_address: string;
+  activity_count: number;
+  last_seen: string | null;
+  range_name: string | null;
+}
+
+export interface TopActiveDevicesResponse {
+  data: TopActiveDevice[];
+  period_days: number;
+}
+
+export interface ChartUtilizationData {
+  name: string;
+  assigned: number;
+  available: number;
+  utilization: number;
+  total: number;
+}

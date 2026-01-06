@@ -1,16 +1,30 @@
 """
 Statistics API endpoints for DHCP Admin
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Dict, Any
+from datetime import datetime, timedelta
+import logging
 
 from ...database import get_db
 from ...dependencies import get_current_user
 from ...models.user import User
 from ...models.device import Device
 from ...models.ip_range import IPRange
+from ...models.syslog import SyslogMessage
 from ...services.ip_range_service import get_ip_range_statistics
+from ...services import device_history_service
+from ...schemas.statistics import (
+    ActivityTimelineResponse,
+    DHCPEventsResponse,
+    DHCPEventData,
+    TopActiveDevicesResponse,
+    TopActiveDevice
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -140,3 +154,146 @@ async def get_recent_devices(
     return {
         'devices': result
     }
+
+
+@router.get("/device-activity-timeline", response_model=ActivityTimelineResponse)
+async def get_device_activity_timeline(
+    days: int = Query(7, ge=1, le=90, description="Number of days to analyze"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get device activity timeline for charts.
+
+    Returns daily aggregated data showing how many devices were active each day.
+    Used for area/line charts showing activity trends over time.
+
+    Args:
+        days: Number of days to look back (1-90)
+
+    Returns:
+        ActivityTimelineResponse with daily activity data
+    """
+    try:
+        timeline_data, period_start, period_end = device_history_service.get_activity_timeline(db, days)
+
+        return ActivityTimelineResponse(
+            data=timeline_data,
+            days=days,
+            period_start=period_start,
+            period_end=period_end
+        )
+    except Exception as e:
+        logger.error(f"Failed to get activity timeline: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve activity timeline: {str(e)}")
+
+
+@router.get("/dhcp-events", response_model=DHCPEventsResponse)
+async def get_dhcp_events_stats(
+    hours: int = Query(24, ge=1, le=168, description="Number of hours to analyze"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get DHCP event statistics from syslog for pie chart visualization.
+
+    Parses syslog messages to count DHCP events by type:
+    - DISCOVER: Client searching for DHCP server
+    - OFFER: Server offering IP address
+    - REQUEST: Client requesting offered IP
+    - ACK: Server acknowledging IP assignment
+    - NAK: Server denying request
+
+    Args:
+        hours: Number of hours to analyze (1-168 = 7 days)
+
+    Returns:
+        DHCPEventsResponse with event counts and colors for charts
+    """
+    since = datetime.utcnow() - timedelta(hours=hours)
+
+    # DHCP event types and their chart colors
+    event_types = {
+        'DISCOVER': '#8884d8',  # Blue
+        'OFFER': '#82ca9d',     # Green
+        'REQUEST': '#ffc658',   # Yellow
+        'ACK': '#0088fe',       # Dark Blue
+        'NAK': '#ff4d4f',       # Red
+        'RELEASE': '#a4de6c'    # Light Green
+    }
+
+    try:
+        data = []
+        total_events = 0
+
+        for event_type, color in event_types.items():
+            # Count messages containing this DHCP event type
+            count = db.query(SyslogMessage).filter(
+                SyslogMessage.timestamp >= since,
+                SyslogMessage.message.ilike(f'%DHCP{event_type}%')
+            ).count()
+
+            if count > 0:
+                data.append(DHCPEventData(
+                    name=event_type,
+                    value=count,
+                    color=color
+                ))
+                total_events += count
+
+        return DHCPEventsResponse(
+            data=data,
+            total_events=total_events,
+            time_range_hours=hours
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get DHCP events: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve DHCP events: {str(e)}")
+
+
+@router.get("/top-active-devices", response_model=TopActiveDevicesResponse)
+async def get_top_active_devices(
+    limit: int = Query(10, ge=5, le=50, description="Number of devices to return"),
+    days: int = Query(7, ge=1, le=30, description="Number of days to analyze"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get most active devices based on DHCP activity.
+
+    Ranks devices by number of DHCP events (ACK, REQUEST) recorded in DeviceHistory.
+    Includes device details and IP range information.
+
+    Args:
+        limit: Number of top devices to return (5-50)
+        days: Period to analyze (1-30 days)
+
+    Returns:
+        TopActiveDevicesResponse with ranked devices and activity counts
+    """
+    try:
+        top_devices = device_history_service.get_top_active_devices(db, limit, days)
+
+        # Convert to Pydantic models
+        devices = [
+            TopActiveDevice(
+                device_id=d['device_id'],
+                hostname=d['hostname'],
+                ip_address=d['ip_address'],
+                mac_address=d['mac_address'],
+                activity_count=d['activity_count'],
+                last_seen=d['last_seen'],
+                range_name=d['range_name']
+            )
+            for d in top_devices
+        ]
+
+        return TopActiveDevicesResponse(
+            data=devices,
+            period_days=days
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get top active devices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve top active devices: {str(e)}")

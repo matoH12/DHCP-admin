@@ -10,6 +10,67 @@ from app.services.auth_service import create_admin_user_if_not_exists
 from app.config import settings
 from ipaddress import IPv4Network
 import json
+import subprocess
+import socket
+
+
+def get_container_network_subnet() -> str:
+    """
+    Auto-detect the Docker network subnet that this container is connected to.
+    Reads the container's network interface to determine the subnet.
+
+    Returns:
+        Subnet in CIDR format (e.g., "172.18.0.0/16")
+    """
+    try:
+        # Read network interface info from /proc/net/route to find default gateway
+        result = subprocess.run(
+            ["ip", "route", "show", "default"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0:
+            # Output format: "default via 172.18.0.1 dev eth0"
+            parts = result.stdout.strip().split()
+            if len(parts) >= 3:
+                gateway_ip = parts[2]  # The gateway IP
+
+                # Get the IP and netmask of eth0
+                ip_result = subprocess.run(
+                    ["ip", "-o", "-f", "inet", "addr", "show", "eth0"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if ip_result.returncode == 0:
+                    # Output format: "2: eth0    inet 172.18.0.5/16 brd 172.18.255.255 scope global eth0"
+                    for line in ip_result.stdout.strip().split('\n'):
+                        if 'inet' in line:
+                            parts = line.split()
+                            for i, part in enumerate(parts):
+                                if part == 'inet' and i + 1 < len(parts):
+                                    # Get IP/CIDR (e.g., "172.18.0.5/16")
+                                    ip_cidr = parts[i + 1]
+                                    from ipaddress import ip_interface
+                                    interface = ip_interface(ip_cidr)
+                                    subnet = str(interface.network)
+                                    print(f"🔍 Auto-detected Docker network: {subnet}")
+                                    return subnet
+    except Exception as e:
+        print(f"⚠️  Could not auto-detect Docker network: {e}")
+
+    # Fallback to environment variable
+    if hasattr(settings, 'DOCKER_NETWORK_SUBNET') and settings.DOCKER_NETWORK_SUBNET:
+        print(f"ℹ️  Using DOCKER_NETWORK_SUBNET from environment: {settings.DOCKER_NETWORK_SUBNET}")
+        return settings.DOCKER_NETWORK_SUBNET
+
+    # Default fallback
+    default_subnet = "172.20.0.0/16"
+    print(f"⚠️  Using default subnet: {default_subnet}")
+    return default_subnet
 
 
 def init_example_data():
@@ -34,8 +95,9 @@ def init_example_data():
         if not docker_network_range:
             print("📦 Creating Docker bridge network range...")
 
-            # Parse Docker network from settings
-            docker_net = IPv4Network(settings.DOCKER_NETWORK_SUBNET, strict=False)
+            # Auto-detect the Docker network subnet
+            docker_subnet = get_container_network_subnet()
+            docker_net = IPv4Network(docker_subnet, strict=False)
 
             # Create Docker network IP range (no DHCP pool, just declaration)
             docker_network_range = IPRange(

@@ -26,7 +26,8 @@ services:
 
       # DHCP Configuration
       - DHCP_CONFIG_PATH=/dhcp-config/dhcpd.conf
-      - DOCKER_NETWORK_SUBNET=${DOCKER_NETWORK_SUBNET:-10.50.0.0/20}
+      # Docker network is auto-detected, but you can override it:
+      # - DOCKER_NETWORK_SUBNET=${DOCKER_NETWORK_SUBNET}
 
       # Admin User (CHANGE THESE IN PRODUCTION!)
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
@@ -104,10 +105,8 @@ services:
 networks:
   dhcp-admin-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 10.50.0.0/20
-          gateway: 10.50.0.1
+    # Docker will auto-assign a free subnet from its default pool
+    # The backend will auto-detect the subnet and add it to the database
 
 volumes:
   dhcp-data:

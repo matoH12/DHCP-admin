@@ -5,6 +5,7 @@ RUN apt-get update && \
     apt-get install -y \
     isc-dhcp-server \
     rsyslog \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create necessary directories

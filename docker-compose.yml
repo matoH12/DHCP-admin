@@ -82,9 +82,16 @@ services:
       dockerfile: Dockerfile
     container_name: dhcp-admin-dhcp-server
     restart: unless-stopped
-    ports:
-      - "67:67/udp"  # DHCP server port
-      - "68:68/udp"  # DHCP client port
+    # Use host network for DHCP to work on physical network interfaces
+    network_mode: host
+    # Network capabilities required for DHCP operation
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      # Backend syslog server (will be auto-detected from Docker network)
+      - BACKEND_SYSLOG_HOST=backend
+      - BACKEND_SYSLOG_PORT=514
     volumes:
       # Shared DHCP configuration with backend
       - ./dhcp-config:/dhcp-config
@@ -94,13 +101,8 @@ services:
 
       # DHCP logs (shared with backend)
       - ./dhcp-logs:/var/log/dhcp
-    networks:
-      - dhcp-admin-network
     depends_on:
       - backend
-    # Network mode for DHCP to work properly (optional, depends on network setup)
-    # Uncomment if you need DHCP server to work on host network:
-    # network_mode: host
 
 networks:
   dhcp-admin-network:

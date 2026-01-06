@@ -129,7 +129,11 @@ export interface OverviewStatistics {
     assigned: number;
     available: number;
     utilization: number;
+    total: number;
   }[];
+  chart_data?: {
+    utilization_by_range: ChartUtilizationData[];
+  };
 }
 
 export interface DevicesByRangeStats {

@@ -20,7 +20,10 @@ import type {
   Setting,
   SettingUpdate,
   DHCPStatus,
-  DHCPActivateResponse
+  DHCPActivateResponse,
+  ActivityTimelineResponse,
+  DHCPEventsResponse,
+  TopActiveDevicesResponse
 } from '../types/api';
 
 class ApiService {

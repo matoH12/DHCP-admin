@@ -15,11 +15,13 @@ A modern web-based management interface for ISC DHCP Server with authentication,
 - 📋 **Device Management** - Full CRUD operations for DHCP static host reservations
 - 🌐 **IP Range Management** - Define networks with CIDR notation and dynamic pools
 - 🔍 **Advanced Search** - Intuitive search across hostname, MAC address, and IP
-- 📊 **Statistics Dashboard** - Real-time overview of IP utilization and network status
+- 📊 **Analytics Dashboard** - Interactive charts with Recharts showing IP utilization, device activity, DHCP events, and top active devices
+- 📈 **Device Activity Tracking** - Historical device activity tracking with 90-day retention
 - 📄 **DHCP Config Generation** - Automatic generation of ISC DHCP compatible `dhcpd.conf`
 - 👥 **User Management** - Role-based access control (Admin, Read-Write, Read-Only)
 - 📡 **Syslog Server** - Built-in syslog server for DHCP log collection and analysis
 - ⏱️ **Last Seen Tracking** - Monitor device activity based on DHCP logs
+- 📚 **API Documentation** - Swagger UI and ReDoc accessible from Settings page (protected by authentication)
 - ✅ **Comprehensive Validation** - Hostname, MAC address, and IP address validation
 
 ### Security Features
@@ -65,9 +67,9 @@ A modern web-based management interface for ISC DHCP Server with authentication,
 - **TypeScript** - Type-safe JavaScript
 - **Vite** - Next generation frontend tooling
 - **Ant Design** - Enterprise-grade UI components
-- **React Query** - Powerful data synchronization
+- **Recharts** - Composable charting library for analytics visualizations
 - **Axios** - Promise-based HTTP client
-- **Day.js** - Lightweight date library
+- **Day.js** - Lightweight date library with Slovak locale support
 
 ### Infrastructure
 - **Docker & Docker Compose** - Containerized deployment
@@ -235,9 +237,19 @@ Access: http://localhost:3003
 
 ### Interactive Documentation
 
-Once the application is running, visit:
-- **Swagger UI**: http://localhost:8002/docs
-- **ReDoc**: http://localhost:8002/redoc
+Access API documentation directly from the web interface:
+
+1. **Login** to the application at http://localhost:3003
+2. **Navigate** to Settings (Nastavenia)
+3. **Click** on API Documentation cards:
+   - **Swagger UI** - Interactive API testing with request/response examples
+   - **ReDoc** - Clean, readable API documentation
+
+The documentation is **protected by authentication** - your JWT token is automatically included when you open it from the Settings page.
+
+**Alternative access** (requires manual token):
+- Swagger UI: http://localhost:3003/api/docs (with Authorization header)
+- ReDoc: http://localhost:3003/api/redoc (with Authorization header)
 
 ### Authentication
 
@@ -306,10 +318,13 @@ Content-Type: application/json
 - `GET /api/v1/syslog/count` - Message count
 - `DELETE /api/v1/syslog/bulk` - Delete old logs
 
-#### Statistics
-- `GET /api/v1/stats/overview` - System overview
+#### Statistics & Analytics
+- `GET /api/v1/stats/overview` - System overview with chart data
 - `GET /api/v1/stats/devices-by-range` - Devices per range
 - `GET /api/v1/stats/recent-devices` - Recently added devices
+- `GET /api/v1/stats/device-activity-timeline` - Daily device activity for charts (7-90 days)
+- `GET /api/v1/stats/dhcp-events` - DHCP event distribution for pie charts (1-168 hours)
+- `GET /api/v1/stats/top-active-devices` - Most active devices ranking (5-50 devices, 1-30 days)
 
 ### Example: Creating an IP Range
 
@@ -508,10 +523,74 @@ See [FLEXIBLE-DEPLOYMENT.md](FLEXIBLE-DEPLOYMENT.md) for setup instructions.
 - hostname: VARCHAR(255)
 - program: VARCHAR(100)
 - severity: VARCHAR(20)
+- facility: VARCHAR(20)
 - message: TEXT
+- raw_message: TEXT
 - source_ip: VARCHAR(15)
-- received_at: DATETIME
+- created_at: DATETIME
 ```
+
+### DeviceHistory
+```sql
+- id: INTEGER PRIMARY KEY
+- device_id: INTEGER FOREIGN KEY
+- timestamp: DATETIME (indexed)
+- ip_address: VARCHAR(15)
+- mac_address: VARCHAR(17)
+- event_type: VARCHAR(20) (ACK, REQUEST, etc.)
+- is_active: BOOLEAN
+```
+
+### Settings
+```sql
+- key: VARCHAR(100) PRIMARY KEY
+- value: TEXT
+- description: TEXT
+```
+
+## 📊 Dashboard Analytics
+
+The dashboard features **4 interactive charts** powered by Recharts:
+
+### 1. IP Utilization Bar Chart
+- **Stacked bar chart** showing assigned vs available IPs per range
+- **Color-coded**: Blue (assigned), Green (available)
+- **Custom tooltips** with utilization percentage
+- Updates in real-time with data changes
+
+### 2. Device Activity Timeline
+- **Area chart** showing daily device activity over time
+- **Period selector**: 7 or 30 days
+- **Metrics**: Active devices and total DHCP events per day
+- **Auto-refresh**: Updates every 60 seconds
+- Data from `DeviceHistory` table
+
+### 3. DHCP Events Pie Chart
+- **Pie chart** showing distribution of DHCP event types
+- **Event types**: DISCOVER, OFFER, REQUEST, ACK, NAK, RELEASE
+- **Time range**: Last 24 hours
+- **Color-coded** by event type
+- Data parsed from syslog messages
+
+### 4. Top Active Devices List
+- **Ranked list** of most active devices (7 days)
+- **Shows**: Hostname, IP, MAC, activity count, last seen
+- **Visual ranking**: Top 3 highlighted in green
+- **Relative timestamps** in Slovak locale
+
+### Device History Tracking
+
+**Automatic Activity Recording:**
+- Every DHCP ACK/REQUEST event creates a `DeviceHistory` record
+- Tracks: device_id, timestamp, IP, MAC, event_type
+- **90-day retention** with automatic cleanup
+- **Optimized queries** with composite indexes
+
+**Use Cases:**
+- Identify most/least active devices
+- Track device activity patterns
+- Historical presence analysis
+- Network usage trends
 
 ## 📝 Generated DHCP Configuration
 
@@ -786,14 +865,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🗺️ Roadmap
 
+### Completed ✅
+- [x] Dashboard analytics with interactive charts (Recharts)
+- [x] Device activity history tracking
+- [x] DHCP event analysis from syslog
+- [x] Protected API documentation (Swagger/ReDoc)
+- [x] Automatic syslog cleanup with configurable retention
+
+### Planned Features
 - [ ] IPv6 support
 - [ ] Multi-server management
 - [ ] DHCP failover configuration
-- [ ] Advanced reporting and analytics
-- [ ] Email notifications
+- [ ] Email notifications for critical events
 - [ ] LDAP/Active Directory integration
 - [ ] REST API webhook support
-- [ ] Mobile responsive UI improvements
+- [ ] Export reports (PDF, CSV)
+- [ ] Network topology visualization
+- [ ] Advanced alerting system
+- [ ] Backup/restore functionality
 
 ---
 

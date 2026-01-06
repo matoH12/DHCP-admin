@@ -152,6 +152,22 @@ def extract_mac_from_dhcp_log(message: str) -> str | None:
     return None
 
 
+def extract_dhcp_event_type(message: str) -> str | None:
+    """
+    Extract DHCP event type from log message.
+
+    Returns: DISCOVER, OFFER, REQUEST, ACK, NAK, RELEASE, INFORM, or None
+    """
+    dhcp_events = ['DHCPDISCOVER', 'DHCPOFFER', 'DHCPREQUEST', 'DHCPACK', 'DHCPNAK', 'DHCPRELEASE', 'DHCPINFORM']
+
+    for event in dhcp_events:
+        if event in message.upper():
+            # Return without 'DHCP' prefix
+            return event.replace('DHCP', '')
+
+    return None
+
+
 def update_device_last_seen(db: Session, mac_address: str, event_type: str = 'ACK'):
     """
     Update last_seen timestamp for device with given MAC address
@@ -222,9 +238,10 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
             if parsed['program'] == 'dhcpd' and parsed['message']:
                 print(f"[SYSLOG DEBUG] Found dhcpd message, checking for MAC...")
                 mac_address = extract_mac_from_dhcp_log(parsed['message'])
+                event_type = extract_dhcp_event_type(parsed['message']) or 'ACK'
                 if mac_address:
-                    print(f"[SYSLOG DEBUG] Extracted MAC: {mac_address}, updating device...")
-                    update_device_last_seen(db, mac_address)
+                    print(f"[SYSLOG DEBUG] Extracted MAC: {mac_address}, event: {event_type}, updating device...")
+                    update_device_last_seen(db, mac_address, event_type)
 
         except Exception as e:
             print(f"[SYSLOG ERROR] Failed to store message: {e}")

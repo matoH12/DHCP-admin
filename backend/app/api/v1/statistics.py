@@ -21,7 +21,8 @@ from ...schemas.statistics import (
     DHCPEventsResponse,
     DHCPEventData,
     TopActiveDevicesResponse,
-    TopActiveDevice
+    TopActiveDevice,
+    ChartUtilizationData
 )
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ async def get_overview_statistics(
     total_assigned_ips = 0
 
     range_stats = []
+    chart_data = []
     for ip_range in ip_ranges:
         stats = get_ip_range_statistics(db, ip_range.id)
         total_usable_ips += stats['total_usable']
@@ -71,7 +73,17 @@ async def get_overview_statistics(
             'network': f"{ip_range.network_address}/{ip_range.cidr}",
             'assigned': stats['assigned'],
             'available': stats['available'],
-            'utilization': stats['utilization_percent']
+            'utilization': stats['utilization_percent'],
+            'total': stats['total_usable']
+        })
+
+        # Chart data for bar charts
+        chart_data.append({
+            'name': ip_range.name,
+            'assigned': stats['assigned'],
+            'available': stats['available'],
+            'utilization': round(stats['utilization_percent'], 1),
+            'total': stats['total_usable']
         })
 
     # Calculate overall utilization
@@ -88,7 +100,10 @@ async def get_overview_statistics(
             'total_available_ips': total_usable_ips - total_assigned_ips,
             'overall_utilization_percent': round(overall_utilization, 2)
         },
-        'ranges': range_stats
+        'ranges': range_stats,
+        'chart_data': {
+            'utilization_by_range': chart_data
+        }
     }
 
 

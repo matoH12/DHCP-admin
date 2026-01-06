@@ -107,17 +107,10 @@ export function SettingsPage() {
       return;
     }
 
-    // Open Swagger UI in new window with token in Authorization header
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const docsUrl = `${backendUrl}/api/docs`;
+    // Use relative URL to go through nginx proxy
+    const docsUrl = '/api/docs';
 
-    // Create a form to POST the request with Authorization header
-    const form = document.createElement('form');
-    form.method = 'GET';
-    form.action = docsUrl;
-    form.target = '_blank';
-
-    // We'll use a different approach - open in new window and set headers via fetch
+    // Open in new window and fetch with authorization
     const newWindow = window.open('about:blank', '_blank');
     if (newWindow) {
       fetch(docsUrl, {
@@ -132,7 +125,8 @@ export function SettingsPage() {
             newWindow.document.close();
           }
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('Failed to open Swagger:', error);
           message.error('Nepodarilo sa otvoriť Swagger dokumentáciu');
           if (newWindow) newWindow.close();
         });
@@ -146,8 +140,8 @@ export function SettingsPage() {
       return;
     }
 
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const redocUrl = `${backendUrl}/api/redoc`;
+    // Use relative URL to go through nginx proxy
+    const redocUrl = '/api/redoc';
 
     const newWindow = window.open('about:blank', '_blank');
     if (newWindow) {
@@ -163,7 +157,8 @@ export function SettingsPage() {
             newWindow.document.close();
           }
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('Failed to open ReDoc:', error);
           message.error('Nepodarilo sa otvoriť ReDoc dokumentáciu');
           if (newWindow) newWindow.close();
         });

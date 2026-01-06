@@ -4,7 +4,7 @@ Device History Model
 Tracks device activity over time for analytics and historical reporting.
 Records are created when DHCP events (ACK, REQUEST) are detected in syslog.
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..database import Base
@@ -33,6 +33,12 @@ class DeviceHistory(Base):
 
     # Relationships
     device = relationship("Device", backref="history")
+
+    # Composite indexes for optimized query performance
+    __table_args__ = (
+        Index('idx_device_history_device_timestamp', 'device_id', 'timestamp'),
+        Index('idx_device_history_timestamp', 'timestamp'),
+    )
 
     def __repr__(self):
         return f"<DeviceHistory(device_id={self.device_id}, event={self.event_type}, timestamp={self.timestamp})>"

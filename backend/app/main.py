@@ -1,22 +1,28 @@
 """
 DHCP Admin - Main FastAPI application
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import HTMLResponse, JSONResponse
 from .config import settings
 from .database import engine, Base
 from .middleware import setup_security_middleware
+from .dependencies import get_current_user
+from .models.user import User
 
 # Import models to create tables
 from .models import User, Device, IPRange, DHCPConfig, SyslogMessage, Settings  # noqa: F401
 
-# Create FastAPI app
+# Create FastAPI app with docs disabled (we'll create custom protected endpoints)
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="Web application for managing ISC DHCP server",
-    docs_url="/api/docs" if settings.DEBUG else None,  # Disable docs in production
-    redoc_url="/api/redoc" if settings.DEBUG else None,
+    docs_url=None,  # Disable default docs
+    redoc_url=None,  # Disable default redoc
+    openapi_url=None,  # Disable default OpenAPI JSON
 )
 
 # Configure CORS (if enabled)
@@ -117,6 +123,126 @@ async def root():
 async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+# Protected API Documentation Endpoints
+@app.get("/api/openapi.json", include_in_schema=False)
+async def get_open_api_endpoint(current_user: User = Depends(get_current_user)):
+    """
+    OpenAPI JSON schema (protected by authentication)
+
+    Requires: Valid JWT token in Authorization header
+    """
+    return JSONResponse(
+        content=get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+    )
+
+
+@app.get("/api/docs", include_in_schema=False, response_class=HTMLResponse)
+async def get_swagger_documentation(request: Request, current_user: User = Depends(get_current_user)):
+    """
+    Swagger UI documentation (protected by authentication)
+
+    Requires: Valid JWT token in Authorization header
+    """
+    # Get the token from the request
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+
+    return HTMLResponse(content=f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>{app.title} - Swagger UI</title>
+        <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui.css" />
+        <link rel="icon" type="image/png" href="/favicon.ico" />
+        <style>
+            html {{ box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }}
+            *, *:before, *:after {{ box-sizing: inherit; }}
+            body {{ margin:0; padding:0; }}
+        </style>
+    </head>
+    <body>
+        <div id="swagger-ui"></div>
+        <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+        <script>
+        window.onload = function() {{
+            const ui = SwaggerUIBundle({{
+                url: "/api/openapi.json",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                requestInterceptor: (request) => {{
+                    request.headers['Authorization'] = 'Bearer {token}';
+                    return request;
+                }},
+                onComplete: () => {{
+                    // Pre-authorize with the token
+                    ui.preauthorizeApiKey("HTTPBearer", "Bearer {token}");
+                }}
+            }});
+            window.ui = ui;
+        }};
+        </script>
+    </body>
+    </html>
+    """)
+
+
+@app.get("/api/redoc", include_in_schema=False, response_class=HTMLResponse)
+async def get_redoc_documentation(request: Request, current_user: User = Depends(get_current_user)):
+    """
+    ReDoc documentation (protected by authentication)
+
+    Requires: Valid JWT token in Authorization header
+    """
+    # Get the token from the request
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+
+    return HTMLResponse(content=f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{app.title} - ReDoc</title>
+        <link rel="icon" type="image/png" href="/favicon.ico" />
+        <style>
+            body {{ margin: 0; padding: 0; }}
+        </style>
+    </head>
+    <body>
+        <redoc spec-url="/api/openapi.json"></redoc>
+        <script src="https://cdn.jsdelivr.net/npm/redoc@2.1.3/bundles/redoc.standalone.js"></script>
+        <script>
+        // Add authorization header to all requests
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {{}}) {{
+            if (!options.headers) {{
+                options.headers = {{}};
+            }}
+            options.headers['Authorization'] = 'Bearer {token}';
+            return originalFetch(url, options);
+        }};
+        </script>
+    </body>
+    </html>
+    """)
 
 
 # Include API routers

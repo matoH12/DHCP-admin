@@ -19,9 +19,10 @@ export function PendingChangesBanner() {
   const checkPendingChanges = async () => {
     try {
       const status = await apiService.getDHCPStatus();
+      console.log('[PendingChangesBanner] DHCP status:', status);
       setHasPendingChanges(status.pending_changes);
     } catch (error) {
-      console.error('Failed to check DHCP status:', error);
+      console.error('[PendingChangesBanner] Failed to check DHCP status:', error);
     }
   };
 

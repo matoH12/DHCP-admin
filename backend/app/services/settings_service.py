@@ -10,17 +10,14 @@ def create_default_settings_if_not_exists(db: Session) -> bool:
     """
     Create default settings if they don't exist
 
+    Checks each setting individually and creates only missing ones.
+
     Args:
         db: Database session
 
     Returns:
-        True if settings were created, False if they already existed
+        True if any settings were created, False if all already existed
     """
-    # Check if settings already exist
-    existing_count = db.query(Settings).count()
-    if existing_count > 0:
-        return False
-
     # Default settings
     default_settings = [
         {
@@ -45,19 +42,28 @@ def create_default_settings_if_not_exists(db: Session) -> bool:
         }
     ]
 
-    # Create settings
-    for setting_data in default_settings:
-        setting = Settings(
-            key=setting_data['key'],
-            value=setting_data['value'],
-            description=setting_data['description'],
-            updated_at=datetime.utcnow()
-        )
-        db.add(setting)
+    created_count = 0
 
-    db.commit()
-    print(f"✅ Created {len(default_settings)} default settings")
-    return True
+    # Create each setting if it doesn't exist
+    for setting_data in default_settings:
+        existing = db.query(Settings).filter(Settings.key == setting_data['key']).first()
+
+        if not existing:
+            setting = Settings(
+                key=setting_data['key'],
+                value=setting_data['value'],
+                description=setting_data['description'],
+                updated_at=datetime.utcnow()
+            )
+            db.add(setting)
+            created_count += 1
+
+    if created_count > 0:
+        db.commit()
+        print(f"✅ Created {created_count} default settings")
+        return True
+
+    return False
 
 
 def get_setting_value(db: Session, key: str, default: str = None) -> str | None:

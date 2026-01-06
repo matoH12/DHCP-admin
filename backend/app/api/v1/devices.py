@@ -8,7 +8,6 @@ from ...database import get_db
 from ...dependencies import get_current_user
 from ...schemas.device import Device, DeviceCreate, DeviceUpdate
 from ...services import device_service
-from ...services import syslog_service
 from ...models.user import User
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
@@ -48,28 +47,9 @@ def list_devices(
         is_active=is_active
     )
 
-    # Get last_seen timestamps from syslog for all devices
-    last_seen_map = syslog_service.get_devices_last_seen(db, devices)
-
-    # Add last_seen to each device
-    result = []
-    for device in devices:
-        device_dict = {
-            'id': device.id,
-            'hostname': device.hostname,
-            'mac_address': device.mac_address,
-            'ip_address': device.ip_address,
-            'ip_range_id': device.ip_range_id,
-            'description': device.description,
-            'is_active': device.is_active,
-            'created_at': device.created_at,
-            'updated_at': device.updated_at,
-            'created_by': device.created_by,
-            'last_seen': last_seen_map.get(device.id)
-        }
-        result.append(Device(**device_dict))
-
-    return result
+    # Return devices with last_seen from database
+    # (updated automatically by log monitor from DHCP logs)
+    return devices
 
 
 @router.get("/{device_id}", response_model=Device)
@@ -99,29 +79,9 @@ def get_device(
             detail=f"Device with ID {device_id} not found"
         )
 
-    # Get last_seen from syslog
-    last_seen = syslog_service.get_device_last_seen(
-        db,
-        device.mac_address,
-        device.ip_address
-    )
-
-    # Create device dict with last_seen
-    device_dict = {
-        'id': device.id,
-        'hostname': device.hostname,
-        'mac_address': device.mac_address,
-        'ip_address': device.ip_address,
-        'ip_range_id': device.ip_range_id,
-        'description': device.description,
-        'is_active': device.is_active,
-        'created_at': device.created_at,
-        'updated_at': device.updated_at,
-        'created_by': device.created_by,
-        'last_seen': last_seen
-    }
-
-    return Device(**device_dict)
+    # Return device with last_seen from database
+    # (updated automatically by log monitor from DHCP logs)
+    return device
 
 
 @router.post("/", response_model=Device, status_code=status.HTTP_201_CREATED)

@@ -12,12 +12,15 @@ import {
   Button,
   Modal,
   Alert,
+  Select,
 } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
+  SortAscendingOutlined,
+  SortDescendingOutlined,
 } from '@ant-design/icons';
 import { apiService } from '../../services/api';
 
@@ -38,19 +41,21 @@ interface DHCPLogsResponse {
     modified: string;
   };
   log_file: string;
+  order: string;
 }
 
 export function LogsPage() {
   const [logsData, setLogsData] = useState<DHCPLogsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadLogs();
     // Auto-refresh every 15 seconds
     const interval = setInterval(loadLogs, 15000);
     return () => clearInterval(interval);
-  }, [searchTerm]);
+  }, [searchTerm, sortOrder]);
 
   const loadLogs = async () => {
     setLoading(true);
@@ -58,6 +63,7 @@ export function LogsPage() {
       const data = await apiService.getDHCPLogs({
         lines: 500,
         ...(searchTerm && { search: searchTerm }),
+        order: sortOrder,
       });
       setLogsData(data);
     } catch (error) {
@@ -190,6 +196,19 @@ export function LogsPage() {
               onSearch={handleSearch}
               style={{ width: 400 }}
             />
+
+            <Select
+              value={sortOrder}
+              onChange={setSortOrder}
+              style={{ width: 180 }}
+            >
+              <Select.Option value="desc">
+                <SortDescendingOutlined /> Najnovšie prvé
+              </Select.Option>
+              <Select.Option value="asc">
+                <SortAscendingOutlined /> Najstaršie prvé
+              </Select.Option>
+            </Select>
 
             <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
               Obnoviť

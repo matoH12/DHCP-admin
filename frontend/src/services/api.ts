@@ -308,6 +308,7 @@ class ApiService {
   async getDHCPLogs(params?: {
     lines?: number;
     search?: string;
+    order?: 'asc' | 'desc';
   }): Promise<any> {
     const response = await this.api.get('/logs/dhcp', { params });
     return response.data;

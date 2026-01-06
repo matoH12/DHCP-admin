@@ -14,7 +14,7 @@ router = APIRouter(prefix="/logs", tags=["Logs"])
 DHCP_LOG_DIR = "/var/log/dhcp"
 
 
-def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None) -> List[dict]:
+def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None, order: str = "desc") -> List[dict]:
     """
     Read last N lines from log file
 
@@ -22,6 +22,7 @@ def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None
         file_path: Path to log file
         lines: Number of lines to read from end
         search: Optional search filter
+        order: Sort order - "desc" for newest first (default), "asc" for oldest first
 
     Returns:
         List of log line dictionaries
@@ -53,6 +54,10 @@ def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None
                 "timestamp": extract_timestamp(line)
             })
 
+        # Sort by order (desc = newest first, asc = oldest first)
+        if order == "desc":
+            result.reverse()
+
         return result
     except Exception as e:
         raise HTTPException(
@@ -78,6 +83,7 @@ def extract_timestamp(log_line: str) -> Optional[str]:
 def get_dhcp_logs(
     lines: int = Query(100, le=1000, description="Number of recent lines to retrieve"),
     search: Optional[str] = Query(None, description="Search term to filter logs"),
+    order: str = Query("desc", regex="^(asc|desc)$", description="Sort order: 'desc' for newest first, 'asc' for oldest first"),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -86,6 +92,7 @@ def get_dhcp_logs(
     Args:
         lines: Number of recent lines to retrieve (max 1000)
         search: Optional search filter
+        order: Sort order - "desc" for newest first (default), "asc" for oldest first
         current_user: Current authenticated user
 
     Returns:
@@ -93,7 +100,7 @@ def get_dhcp_logs(
     """
     dhcpd_log = os.path.join(DHCP_LOG_DIR, "dhcpd.log")
 
-    log_lines = read_log_file(dhcpd_log, lines=lines, search=search)
+    log_lines = read_log_file(dhcpd_log, lines=lines, search=search, order=order)
 
     # Get file size and modification time
     file_info = {}
@@ -108,7 +115,8 @@ def get_dhcp_logs(
         "logs": log_lines,
         "total_lines": len(log_lines),
         "file_info": file_info,
-        "log_file": "dhcpd.log"
+        "log_file": "dhcpd.log",
+        "order": order
     }
 
 

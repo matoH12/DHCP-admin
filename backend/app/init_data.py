@@ -28,6 +28,7 @@ def init_example_data():
             print("⚠️  Could not create or find admin user, skipping example data initialization")
             return
 
+        # ========== ALWAYS CREATE DOCKER NETWORK (CRITICAL FOR DHCP) ==========
         # Check if Docker network range already exists
         docker_network_range = db.query(IPRange).filter(IPRange.name == "Docker Bridge Network").first()
         if not docker_network_range:
@@ -55,10 +56,11 @@ def init_example_data():
         else:
             print(f"ℹ️  Docker network already exists: {docker_network_range.name}")
 
+        # ========== OPTIONAL EXAMPLE DATA ==========
         # Check if example network already exists
         existing_range = db.query(IPRange).filter(IPRange.name == "Example Office Network").first()
         if existing_range:
-            print("ℹ️  Example data already exists, skipping initialization")
+            print("ℹ️  Example office network already exists, skipping example data")
             return
 
         print("📦 Creating example network and device...")

@@ -60,6 +60,7 @@ async def startup_event():
     from .services.settings_service import create_default_settings_if_not_exists
     from .services.log_monitor import start_log_monitor
     from .services.cleanup_scheduler import start_cleanup_scheduler
+    from .services.syslog_server import start_syslog_server_thread
 
     # Create database tables
     Base.metadata.create_all(bind=engine)
@@ -84,6 +85,9 @@ async def startup_event():
 
     # Start log file monitor for device last_seen updates
     start_log_monitor()
+
+    # Start syslog UDP server for receiving DHCP server logs
+    start_syslog_server_thread(host='0.0.0.0', port=514)
 
     # Start cleanup scheduler
     start_cleanup_scheduler()

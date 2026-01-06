@@ -152,9 +152,15 @@ def extract_mac_from_dhcp_log(message: str) -> str | None:
     return None
 
 
-def update_device_last_seen(db: Session, mac_address: str):
+def update_device_last_seen(db: Session, mac_address: str, event_type: str = 'ACK'):
     """
     Update last_seen timestamp for device with given MAC address
+    and record activity in device history for analytics
+
+    Args:
+        db: Database session
+        mac_address: Device MAC address
+        event_type: DHCP event type (ACK, REQUEST, etc.)
     """
     try:
         device = db.query(Device).filter(Device.mac_address == mac_address).first()
@@ -162,6 +168,20 @@ def update_device_last_seen(db: Session, mac_address: str):
             device.last_seen = datetime.utcnow()
             db.commit()
             print(f"[DHCP] Updated last_seen for device {device.hostname} ({mac_address})")
+
+            # Record activity in device_history for analytics
+            try:
+                from .device_history_service import record_device_activity
+                record_device_activity(
+                    db=db,
+                    device_id=device.id,
+                    event_type=event_type
+                )
+                print(f"[DHCP] Recorded {event_type} activity for device {device.hostname}")
+            except Exception as history_error:
+                print(f"[DHCP WARNING] Failed to record device history: {history_error}")
+                # Don't fail the whole operation if history recording fails
+
             return True
         return False
     except Exception as e:
@@ -196,11 +216,14 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
             db.add(syslog_entry)
             db.commit()
             print(f"[SYSLOG] Received from {source_ip}: {parsed['message'][:100]}")
+            print(f"[SYSLOG DEBUG] program='{parsed['program']}', facility='{parsed['facility']}', severity='{parsed['severity']}'")
 
             # Extract MAC address from DHCP logs and update device last_seen
             if parsed['program'] == 'dhcpd' and parsed['message']:
+                print(f"[SYSLOG DEBUG] Found dhcpd message, checking for MAC...")
                 mac_address = extract_mac_from_dhcp_log(parsed['message'])
                 if mac_address:
+                    print(f"[SYSLOG DEBUG] Extracted MAC: {mac_address}, updating device...")
                     update_device_last_seen(db, mac_address)
 
         except Exception as e:

@@ -2,10 +2,10 @@
 
 echo "Starting DHCP Server..."
 
-# Start rsyslog for local file logging
-# Logs will be written to /var/log/dhcp/dhcpd.log
-# Backend reads logs directly from shared volume
-echo "✓ Starting rsyslog for local file logging"
+# Start rsyslog for local file logging and forwarding
+# Rsyslog config is copied from rsyslog.conf file during build
+# Logs will be written to /var/log/dhcp/dhcpd.log AND forwarded to backend
+echo "✓ Starting rsyslog for local file logging and forwarding"
 rsyslogd
 
 # Wait a bit for rsyslog to start

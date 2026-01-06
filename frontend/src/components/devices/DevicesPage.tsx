@@ -19,6 +19,7 @@ import {
 import { apiService } from '../../services/api';
 import type { Device } from '../../types/api';
 import { DeviceFormModal } from './DeviceFormModal';
+import { useDHCPStatus } from '../../contexts/DHCPStatusContext';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/sk';
@@ -35,6 +36,7 @@ export function DevicesPage() {
   const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const { checkPendingChanges } = useDHCPStatus();
 
   useEffect(() => {
     loadDevices();
@@ -83,6 +85,7 @@ export function DevicesPage() {
       await apiService.deleteDevice(id);
       message.success('Zariadenie bolo zmazané');
       loadDevices();
+      checkPendingChanges();
     } catch (error) {
       message.error('Nepodarilo sa zmazať zariadenie');
     }
@@ -91,6 +94,7 @@ export function DevicesPage() {
   const handleFormSubmit = async () => {
     setIsModalOpen(false);
     await loadDevices();
+    checkPendingChanges();
   };
 
   const columns = [

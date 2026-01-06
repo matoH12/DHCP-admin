@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import skSK from 'antd/locale/sk_SK';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { DHCPStatusProvider } from './contexts/DHCPStatusContext';
 import { LoginPage } from './components/auth/LoginPage';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './components/dashboard/Dashboard';
@@ -115,7 +116,9 @@ function App() {
     <ConfigProvider locale={skSK}>
       <AuthProvider>
         <BrowserRouter>
-          <AppRoutes />
+          <DHCPStatusProvider>
+            <AppRoutes />
+          </DHCPStatusProvider>
         </BrowserRouter>
       </AuthProvider>
     </ConfigProvider>

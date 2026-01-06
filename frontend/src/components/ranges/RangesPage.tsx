@@ -17,6 +17,7 @@ import {
 import { apiService } from '../../services/api';
 import type { IPRange, IPRangeStats } from '../../types/api';
 import { RangeFormModal } from './RangeFormModal';
+import { useDHCPStatus } from '../../contexts/DHCPStatusContext';
 
 const { Title } = Typography;
 
@@ -29,6 +30,7 @@ export function RangesPage() {
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRange, setEditingRange] = useState<IPRange | null>(null);
+  const { checkPendingChanges } = useDHCPStatus();
 
   useEffect(() => {
     loadRanges();
@@ -74,6 +76,7 @@ export function RangesPage() {
       await apiService.deleteRange(id);
       message.success('IP rozsah bol zmazaný');
       loadRanges();
+      checkPendingChanges();
     } catch (error) {
       message.error('Nepodarilo sa zmazať IP rozsah');
     }
@@ -82,6 +85,7 @@ export function RangesPage() {
   const handleFormSubmit = async () => {
     setIsModalOpen(false);
     await loadRanges();
+    checkPendingChanges();
   };
 
   const columns = [

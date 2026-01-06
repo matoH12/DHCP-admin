@@ -1,37 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Alert, Button, Space, message } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
 import { apiService } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { useDHCPStatus } from '../../contexts/DHCPStatusContext';
 
 export function PendingChangesBanner() {
-  const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
-
-  // Check for pending changes on mount and poll every 10 seconds
-  useEffect(() => {
-    checkPendingChanges();
-    const interval = setInterval(checkPendingChanges, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const checkPendingChanges = async () => {
-    try {
-      const status = await apiService.getDHCPStatus();
-      console.log('[PendingChangesBanner] DHCP status:', status);
-      setHasPendingChanges(status.pending_changes);
-    } catch (error) {
-      console.error('[PendingChangesBanner] Failed to check DHCP status:', error);
-    }
-  };
+  const { pendingChanges, checkPendingChanges } = useDHCPStatus();
 
   const handleActivate = async () => {
     setLoading(true);
     try {
       await apiService.activateDHCPConfig();
       message.success('Zmeny boli úspešne aktivované');
-      setHasPendingChanges(false);
+      await checkPendingChanges();
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || 'Nepodarilo sa aktivovať zmeny';
       message.error(errorMsg);
@@ -40,7 +24,7 @@ export function PendingChangesBanner() {
     }
   };
 
-  if (!hasPendingChanges) {
+  if (!pendingChanges) {
     return null;
   }
 

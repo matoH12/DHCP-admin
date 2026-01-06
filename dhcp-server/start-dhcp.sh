@@ -2,35 +2,39 @@
 
 echo "Starting DHCP Server..."
 
-# Find backend container IP address (DHCP server is in host network mode)
-echo "Looking for backend container IP..."
-BACKEND_HOST=${BACKEND_SYSLOG_HOST:-backend}
+# Configure syslog forwarding to backend
+# DHCP server is in host network mode, backend exposes syslog on 0.0.0.0:514
+# Find Docker bridge IP (docker0) where backend is accessible
 BACKEND_PORT=${BACKEND_SYSLOG_PORT:-514}
 
-# Try to resolve backend hostname
-BACKEND_IP=$(getent hosts ${BACKEND_HOST} 2>/dev/null | awk '{ print $1 }' | head -1)
+# Find docker0 bridge IP (Docker's default bridge gateway)
+DOCKER_BRIDGE_IP=$(ip -4 addr show docker0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 
-if [ -z "$BACKEND_IP" ]; then
-    # Fallback: try to find backend on Docker gateway + 2 (common pattern)
-    GATEWAY=$(ip route | grep default | awk '{print $3}')
-    if [ -n "$GATEWAY" ]; then
-        # Backend is usually on gateway IP + 1 or 2
-        BACKEND_IP=$(echo $GATEWAY | awk -F. '{print $1"."$2"."$3"."$4+1}')
-        echo "ℹ️  Trying backend at Docker gateway+1: $BACKEND_IP"
-    fi
+if [ -z "$DOCKER_BRIDGE_IP" ]; then
+    # Fallback: try other common Docker bridge patterns
+    for iface in br-* docker_gwbridge; do
+        DOCKER_BRIDGE_IP=$(ip -4 addr show $iface 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+        if [ -n "$DOCKER_BRIDGE_IP" ]; then
+            echo "✓ Found Docker bridge on $iface: $DOCKER_BRIDGE_IP"
+            break
+        fi
+    done
 fi
 
-if [ -z "$BACKEND_IP" ]; then
-    echo "⚠️  WARNING: Could not find backend IP, syslog forwarding disabled"
-    echo "⚠️  Logs will only be written to /var/log/dhcp/"
+if [ -z "$DOCKER_BRIDGE_IP" ]; then
+    echo "⚠️  WARNING: Could not find Docker bridge IP"
+    echo "⚠️  Syslog forwarding disabled - logs only in /var/log/dhcp/"
 else
-    echo "✓ Found backend at: $BACKEND_IP:$BACKEND_PORT"
-    # Configure rsyslog to forward to backend
+    echo "✓ Configuring syslog forwarding to Docker bridge: ${DOCKER_BRIDGE_IP}:${BACKEND_PORT}"
+
+    # Configure rsyslog to forward to backend via Docker bridge
     cat > /etc/rsyslog.d/90-backend-forward.conf << EOF
-# Forward DHCP logs to backend syslog server
-local7.* @@${BACKEND_IP}:${BACKEND_PORT}
+# Forward DHCP logs to backend syslog server via Docker bridge
+# DHCP server uses host network, backend accessible on Docker bridge IP
+local7.* @@${DOCKER_BRIDGE_IP}:${BACKEND_PORT}
 EOF
-    echo "Starting rsyslog for log forwarding to ${BACKEND_IP}:${BACKEND_PORT}..."
+
+    echo "✓ Rsyslog configured to forward to ${DOCKER_BRIDGE_IP}:${BACKEND_PORT}"
 fi
 
 # Start rsyslog

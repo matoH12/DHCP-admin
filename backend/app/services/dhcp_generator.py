@@ -40,11 +40,19 @@ def generate_dhcpd_conf(db: Session) -> str:
     output.append("# Global DHCP Options")
     output.append("default-lease-time 600;")
     output.append("max-lease-time 7200;")
+    output.append("")
+    output.append("# DDNS update style")
+    output.append("ddns-update-style none;")
+    output.append("")
+    output.append("# Server is authoritative")
     output.append("authoritative;")
     output.append("")
     output.append("# Allow booting")
     output.append("allow booting;")
     output.append("allow bootp;")
+    output.append("")
+    output.append("# Log facility for DHCP events")
+    output.append("log-facility local7;")
     output.append("")
 
     # Get all active IP ranges (including Docker bridge network from database)
@@ -88,6 +96,12 @@ def generate_dhcpd_conf(db: Session) -> str:
         if ip_range.domain_name:
             output.append(f"    option domain-name \"{ip_range.domain_name}\";")
 
+        output.append("")
+
+        # ISC DHCP options for hostname resolution
+        output.append("    # Use hostnames from DNS/hosts")
+        output.append("    get-lease-hostnames true;")
+        output.append("    use-host-decl-names true;")
         output.append("")
 
         # DHCP Pool for dynamic IP allocation

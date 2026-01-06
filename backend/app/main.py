@@ -57,15 +57,17 @@ async def startup_event():
     """Initialize application on startup"""
     from .database import SessionLocal
     from .services.auth_service import create_admin_user_if_not_exists
+    from .services.settings_service import create_default_settings_if_not_exists
     from .services.log_monitor import start_log_monitor
     from .services.cleanup_scheduler import start_cleanup_scheduler
 
     # Create database tables
     Base.metadata.create_all(bind=engine)
 
-    # Create admin user from environment variables
+    # Initialize database with defaults
     db = SessionLocal()
     try:
+        # Create admin user from environment variables
         admin_user = create_admin_user_if_not_exists(
             db,
             username=settings.ADMIN_USERNAME,
@@ -74,6 +76,9 @@ async def startup_event():
         )
         if admin_user:
             print(f"✓ Admin user '{admin_user.username}' ready")
+
+        # Create default settings if they don't exist
+        create_default_settings_if_not_exists(db)
     finally:
         db.close()
 

@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dhcp-admin-backend
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+      - "514:514/udp"  # Syslog UDP port
+    environment:
+      # Application
+      - APP_NAME=DHCP Admin
+      - DEBUG=false
+
+      # Database
+      - DATABASE_URL=sqlite:///./data/dhcp-admin.db
+
+      # Security (CHANGE THESE IN PRODUCTION!)
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-random-secret-key-min-32-chars}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3002,http://localhost:80}
+
+      # DHCP Configuration
+      - DHCP_CONFIG_PATH=/dhcp-config/dhcpd.conf
+
+      # Admin User (CHANGE THESE!)
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@localhost}
+
+    volumes:
+      # Database persistence
+      - ./data:/app/data
+
+      # DHCP config output (mount to your DHCP server config directory)
+      - ./dhcp-config:/dhcp-config
+
+      # For production, you might want to mount directly to /etc/dhcp:
+      # - /etc/dhcp:/dhcp-config
+
+    networks:
+      - dhcp-admin-network
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  dhcp-server:
+    build:
+      context: ./dhcp-server
+      dockerfile: Dockerfile
+    container_name: dhcp-admin-dhcp-server
+    restart: unless-stopped
+    ports:
+      - "67:67/udp"  # DHCP server port
+      - "68:68/udp"  # DHCP client port
+    volumes:
+      # Shared DHCP configuration with backend
+      - ./dhcp-config:/dhcp-config
+
+      # DHCP leases persistence
+      - ./dhcp-leases:/var/lib/dhcp
+    networks:
+      - dhcp-admin-network
+    depends_on:
+      - backend
+    # Network mode for DHCP to work properly (optional, depends on network setup)
+    # Uncomment if you need DHCP server to work on host network:
+    # network_mode: host
+
+networks:
+  dhcp-admin-network:
+    driver: bridge
+
+volumes:
+  dhcp-data:
+    driver: local

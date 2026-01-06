@@ -1,0 +1,220 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.secure
+    container_name: dhcp-admin-backend
+    restart: unless-stopped
+
+    # Security: Run as non-root user
+    user: "1000:1000"
+
+    # Security: Read-only root filesystem (except specific mounts)
+    read_only: true
+
+    # Security: Drop all capabilities, add only required ones
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE  # For binding to port 514
+
+    # Security: No new privileges
+    security_opt:
+      - no-new-privileges:true
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    ports:
+      - "127.0.0.1:8002:8000"  # Bind to localhost only
+      - "514:514/udp"  # Syslog UDP port
+
+    environment:
+      # Application
+      - APP_NAME=DHCP Admin
+      - DEBUG=false
+
+      # Database
+      - DATABASE_URL=sqlite:///./data/dhcp-admin.db
+
+      # Security (use Docker secrets in production)
+      - SECRET_KEY_FILE=/run/secrets/secret_key
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+      # CORS (restrict to your domain in production)
+      - CORS_ORIGINS=https://yourdomain.com
+
+      # DHCP Configuration
+      - DHCP_CONFIG_PATH=/dhcp-config/dhcpd.conf
+
+      # Admin User (use Docker secrets in production)
+      - ADMIN_USERNAME_FILE=/run/secrets/admin_username
+      - ADMIN_PASSWORD_FILE=/run/secrets/admin_password
+      - ADMIN_EMAIL_FILE=/run/secrets/admin_email
+
+    # Docker secrets
+    secrets:
+      - secret_key
+      - admin_username
+      - admin_password
+      - admin_email
+
+    volumes:
+      # Database persistence (writable)
+      - dhcp-data:/app/data
+
+      # DHCP config output (writable)
+      - dhcp-config:/dhcp-config
+
+      # Temporary directory (writable)
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 100M
+
+    networks:
+      - dhcp-admin-network
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  dhcp-server:
+    build:
+      context: ./dhcp-server
+      dockerfile: Dockerfile
+    container_name: dhcp-admin-dhcp-server
+    restart: unless-stopped
+
+    # Security: Drop unnecessary capabilities
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - NET_RAW
+
+    # Security: No new privileges
+    security_opt:
+      - no-new-privileges:true
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    ports:
+      - "67:67/udp"  # DHCP server port
+      - "68:68/udp"  # DHCP client port
+
+    volumes:
+      # Shared DHCP configuration with backend (read-only)
+      - dhcp-config:/dhcp-config:ro
+
+      # DHCP leases persistence (writable)
+      - dhcp-leases:/var/lib/dhcp
+
+    networks:
+      - dhcp-admin-network
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # For production with host network (uncomment if needed)
+    # network_mode: host
+
+  # Nginx reverse proxy with HTTPS (optional but recommended)
+  nginx:
+    image: nginx:alpine
+    container_name: dhcp-admin-nginx
+    restart: unless-stopped
+
+    # Security
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-cache:/var/cache/nginx
+      - type: tmpfs
+        target: /var/run
+        tmpfs:
+          size: 10M
+
+    networks:
+      - dhcp-admin-network
+
+    depends_on:
+      - backend
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+networks:
+  dhcp-admin-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  dhcp-data:
+    driver: local
+  dhcp-config:
+    driver: local
+  dhcp-leases:
+    driver: local
+  nginx-cache:
+    driver: local
+
+# Docker secrets (for production use)
+secrets:
+  secret_key:
+    file: ./secrets/secret_key.txt
+  admin_username:
+    file: ./secrets/admin_username.txt
+  admin_password:
+    file: ./secrets/admin_password.txt
+  admin_email:
+    file: ./secrets/admin_email.txt

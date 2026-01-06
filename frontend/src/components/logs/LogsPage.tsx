@@ -2,205 +2,204 @@ import { useEffect, useState } from 'react';
 import {
   Table,
   Input,
-  Select,
   Typography,
   message,
-  Tag,
   Space,
   Card,
   Row,
   Col,
   Statistic,
   Button,
+  Modal,
+  Alert,
 } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
   DeleteOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { apiService } from '../../services/api';
-import type { SyslogMessage, SyslogStats } from '../../types/api';
 
 const { Title } = Typography;
 const { Search } = Input;
 
-const getSeverityColor = (severity: string | null) => {
-  if (!severity) return 'default';
-  switch (severity.toLowerCase()) {
-    case 'emergency':
-    case 'alert':
-    case 'critical':
-      return 'red';
-    case 'error':
-      return 'volcano';
-    case 'warning':
-      return 'orange';
-    case 'notice':
-      return 'blue';
-    case 'info':
-      return 'cyan';
-    case 'debug':
-      return 'purple';
-    default:
-      return 'default';
-  }
-};
+interface LogLine {
+  line_number: number;
+  content: string;
+  timestamp: string | null;
+}
+
+interface DHCPLogsResponse {
+  logs: LogLine[];
+  total_lines: number;
+  file_info: {
+    size_bytes: number;
+    modified: string;
+  };
+  log_file: string;
+}
 
 export function LogsPage() {
-  const [logs, setLogs] = useState<SyslogMessage[]>([]);
-  const [stats, setStats] = useState<SyslogStats | null>(null);
+  const [logsData, setLogsData] = useState<DHCPLogsResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<{
-    search: string;
-    severity: string | undefined;
-    program: string | undefined;
-    hours: number;
-  }>({
-    search: '',
-    severity: undefined,
-    program: undefined,
-    hours: 24,
-  });
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     loadLogs();
-    loadStats();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      loadLogs();
-      loadStats();
-    }, 30000);
+    // Auto-refresh every 15 seconds
+    const interval = setInterval(loadLogs, 15000);
     return () => clearInterval(interval);
-  }, [filters]);
+  }, [searchTerm]);
 
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getSyslogMessages({
-        limit: 500,
-        search: filters.search || undefined,
-        severity: filters.severity,
-        program: filters.program,
-        hours: filters.hours,
+      const response = await fetch('/api/v1/logs/dhcp?' + new URLSearchParams({
+        lines: '500',
+        ...(searchTerm && { search: searchTerm }),
+      }), {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
       });
-      setLogs(data);
+
+      if (!response.ok) {
+        throw new Error('Failed to load logs');
+      }
+
+      const data: DHCPLogsResponse = await response.json();
+      setLogsData(data);
     } catch (error) {
-      message.error('Nepodarilo sa načítať logy');
+      message.error('Nepodarilo sa načítať DHCP logy');
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const data = await apiService.getSyslogStats(filters.hours);
-      setStats(data);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
-    }
-  };
-
   const handleSearch = (value: string) => {
-    setFilters({ ...filters, search: value });
+    setSearchTerm(value);
   };
 
   const handleRefresh = () => {
     loadLogs();
-    loadStats();
     message.success('Logy obnovené');
   };
 
+  const handleClearLogs = () => {
+    Modal.confirm({
+      title: 'Zmazať všetky DHCP logy?',
+      icon: <ExclamationCircleOutlined />,
+      content: 'Táto akcia vymaže všetky logy zo súborov. Túto akciu nie je možné vrátiť späť.',
+      okText: 'Zmazať',
+      okType: 'danger',
+      cancelText: 'Zrušiť',
+      onOk: async () => {
+        try {
+          const response = await fetch('/api/v1/logs/clear', {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to clear logs');
+          }
+
+          message.success('Logy boli úspešne vymazané');
+          loadLogs();
+        } catch (error) {
+          message.error('Nepodarilo sa zmazať logy');
+          console.error(error);
+        }
+      },
+    });
+  };
+
   const columns = [
+    {
+      title: '#',
+      dataIndex: 'line_number',
+      key: 'line_number',
+      width: 80,
+      render: (num: number) => <span style={{ color: '#999' }}>{num}</span>,
+    },
     {
       title: 'Čas',
       dataIndex: 'timestamp',
       key: 'timestamp',
       width: 180,
-      render: (timestamp: string) => new Date(timestamp).toLocaleString('sk-SK'),
-      sorter: (a: SyslogMessage, b: SyslogMessage) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      render: (timestamp: string | null) => timestamp || '-',
     },
     {
-      title: 'Závažnosť',
-      dataIndex: 'severity',
-      key: 'severity',
-      width: 120,
-      render: (severity: string | null) => severity ? (
-        <Tag color={getSeverityColor(severity)}>{severity.toUpperCase()}</Tag>
-      ) : '-',
-      filters: [
-        { text: 'Emergency', value: 'emergency' },
-        { text: 'Alert', value: 'alert' },
-        { text: 'Critical', value: 'critical' },
-        { text: 'Error', value: 'error' },
-        { text: 'Warning', value: 'warning' },
-        { text: 'Notice', value: 'notice' },
-        { text: 'Info', value: 'info' },
-        { text: 'Debug', value: 'debug' },
-      ],
-      onFilter: (value: string | number | boolean, record: SyslogMessage) =>
-        record.severity === value,
-    },
-    {
-      title: 'Program',
-      dataIndex: 'program',
-      key: 'program',
-      width: 150,
-      render: (program: string | null) => program || '-',
-    },
-    {
-      title: 'Hostname',
-      dataIndex: 'hostname',
-      key: 'hostname',
-      width: 150,
-      render: (hostname: string | null) => hostname || '-',
-    },
-    {
-      title: 'Source IP',
-      dataIndex: 'source_ip',
-      key: 'source_ip',
-      width: 140,
-    },
-    {
-      title: 'Správa',
-      dataIndex: 'message',
-      key: 'message',
-      ellipsis: true,
-      render: (message: string) => (
-        <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{message}</span>
+      title: 'Obsah logu',
+      dataIndex: 'content',
+      key: 'content',
+      ellipsis: false,
+      render: (content: string) => (
+        <pre style={{
+          fontFamily: 'monospace',
+          fontSize: 12,
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}>
+          {content}
+        </pre>
       ),
     },
   ];
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <Title level={2}>Syslog</Title>
+        <Title level={2}>DHCP Server Logy</Title>
 
-        {stats && (
+        {logsData && logsData.file_info && (
           <Row gutter={16} style={{ marginBottom: 24 }}>
-            <Col span={6}>
+            <Col span={8}>
               <Card>
                 <Statistic
-                  title="Celkom správ"
-                  value={stats.total_messages}
-                  suffix={`(${filters.hours}h)`}
+                  title="Počet riadkov"
+                  value={logsData.total_lines}
                 />
               </Card>
             </Col>
-            {Object.entries(stats.severity_counts).slice(0, 3).map(([severity, count]) => (
-              <Col span={6} key={severity}>
-                <Card>
-                  <Statistic
-                    title={severity.toUpperCase()}
-                    value={count}
-                    valueStyle={{ color: severity === 'error' || severity === 'critical' ? '#cf1322' : undefined }}
-                  />
-                </Card>
-              </Col>
-            ))}
+            <Col span={8}>
+              <Card>
+                <Statistic
+                  title="Veľkosť súboru"
+                  value={formatFileSize(logsData.file_info.size_bytes)}
+                />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card>
+                <Statistic
+                  title="Posledná zmena"
+                  value={new Date(logsData.file_info.modified).toLocaleString('sk-SK')}
+                  valueStyle={{ fontSize: 16 }}
+                />
+              </Card>
+            </Col>
           </Row>
         )}
+
+        <Alert
+          message="Automatické obnovenie každých 15 sekúnd"
+          type="info"
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+        />
 
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Space wrap>
@@ -209,58 +208,36 @@ export function LogsPage() {
               allowClear
               enterButton={<SearchOutlined />}
               onSearch={handleSearch}
-              style={{ width: 300 }}
+              style={{ width: 400 }}
             />
-
-            <Select
-              placeholder="Závažnosť"
-              allowClear
-              style={{ width: 150 }}
-              value={filters.severity}
-              onChange={(value) => setFilters({ ...filters, severity: value })}
-            >
-              <Select.Option value="emergency">Emergency</Select.Option>
-              <Select.Option value="alert">Alert</Select.Option>
-              <Select.Option value="critical">Critical</Select.Option>
-              <Select.Option value="error">Error</Select.Option>
-              <Select.Option value="warning">Warning</Select.Option>
-              <Select.Option value="notice">Notice</Select.Option>
-              <Select.Option value="info">Info</Select.Option>
-              <Select.Option value="debug">Debug</Select.Option>
-            </Select>
-
-            <Select
-              placeholder="Časové obdobie"
-              style={{ width: 150 }}
-              value={filters.hours}
-              onChange={(value) => setFilters({ ...filters, hours: value })}
-            >
-              <Select.Option value={1}>Posledná hodina</Select.Option>
-              <Select.Option value={6}>Posledných 6 hodín</Select.Option>
-              <Select.Option value={24}>Posledných 24 hodín</Select.Option>
-              <Select.Option value={72}>Posledné 3 dni</Select.Option>
-              <Select.Option value={168}>Posledný týždeň</Select.Option>
-            </Select>
 
             <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
               Obnoviť
+            </Button>
+
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={handleClearLogs}
+            >
+              Zmazať všetky logy
             </Button>
           </Space>
         </Space>
       </div>
 
       <Table
-        dataSource={logs}
+        dataSource={logsData?.logs || []}
         columns={columns}
-        rowKey="id"
+        rowKey="line_number"
         loading={loading}
         pagination={{
-          pageSize: 50,
-          showTotal: (total) => `Celkom ${total} záznamov`,
+          pageSize: 100,
+          showTotal: (total) => `Celkom ${total} riadkov`,
           showSizeChanger: true,
-          pageSizeOptions: ['20', '50', '100', '200'],
+          pageSizeOptions: ['50', '100', '200', '500'],
         }}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1000 }}
         size="small"
       />
     </div>

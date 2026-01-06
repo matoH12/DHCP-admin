@@ -6,8 +6,9 @@ services:
     container_name: dhcp-admin-backend
     restart: unless-stopped
     ports:
-      - "8002:8000"
-      - "514:514/udp"  # Syslog UDP port
+      # Backend API is NOT exposed externally - only accessible via Docker network
+      # Frontend communicates with backend internally
+      - "514:514/udp"  # Syslog UDP port (for DHCP log forwarding)
     environment:
       # Application
       - APP_NAME=DHCP Admin
@@ -38,6 +39,9 @@ services:
 
       # DHCP config output (mount to your DHCP server config directory)
       - ./dhcp-config:/dhcp-config
+
+      # DHCP logs (shared with dhcp-server)
+      - ./dhcp-logs:/var/log/dhcp
 
       # For production, you might want to mount directly to /etc/dhcp:
       # - /etc/dhcp:/dhcp-config
@@ -86,6 +90,9 @@ services:
 
       # DHCP leases persistence
       - ./dhcp-leases:/var/lib/dhcp
+
+      # DHCP logs (shared with backend)
+      - ./dhcp-logs:/var/log/dhcp
     networks:
       - dhcp-admin-network
     depends_on:

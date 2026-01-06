@@ -10,6 +10,7 @@ from .statistics import router as statistics_router
 from .users import router as users_router
 from .syslog import router as syslog_router
 from .settings import router as settings_router
+from .logs import router as logs_router
 
 # Main API router
 router = APIRouter()
@@ -23,3 +24,4 @@ router.include_router(statistics_router, prefix="/stats", tags=["statistics"])
 router.include_router(users_router)
 router.include_router(syslog_router)
 router.include_router(settings_router)
+router.include_router(logs_router)

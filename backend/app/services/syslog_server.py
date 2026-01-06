@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from sqlalchemy.orm import Session
 from ..models.syslog import SyslogMessage
+from ..models.device import Device
 from ..database import SessionLocal
 import threading
 
@@ -130,6 +131,45 @@ def parse_syslog_message(data: bytes, source_ip: str) -> dict:
     return result
 
 
+def extract_mac_from_dhcp_log(message: str) -> str | None:
+    """
+    Extract MAC address from DHCP log messages
+
+    Examples:
+    - DHCPREQUEST for 192.168.33.3 from 00:50:56:ae:25:0a via ens35
+    - DHCPACK on 192.168.33.3 to 00:50:56:ae:25:0a via ens35
+    - DHCPDISCOVER from 00:11:22:33:44:55 via eth0
+    """
+    # Pattern for MAC address (XX:XX:XX:XX:XX:XX)
+    mac_pattern = r'\b([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2})\b'
+
+    match = re.search(mac_pattern, message)
+    if match:
+        # Normalize to uppercase with colons
+        mac = match.group(1).upper()
+        return mac
+
+    return None
+
+
+def update_device_last_seen(db: Session, mac_address: str):
+    """
+    Update last_seen timestamp for device with given MAC address
+    """
+    try:
+        device = db.query(Device).filter(Device.mac_address == mac_address).first()
+        if device:
+            device.last_seen = datetime.utcnow()
+            db.commit()
+            print(f"[DHCP] Updated last_seen for device {device.hostname} ({mac_address})")
+            return True
+        return False
+    except Exception as e:
+        print(f"[DHCP ERROR] Failed to update last_seen for {mac_address}: {e}")
+        db.rollback()
+        return False
+
+
 class SyslogUDPHandler(socketserver.BaseRequestHandler):
     """Handler for UDP syslog messages"""
 
@@ -156,6 +196,13 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
             db.add(syslog_entry)
             db.commit()
             print(f"[SYSLOG] Received from {source_ip}: {parsed['message'][:100]}")
+
+            # Extract MAC address from DHCP logs and update device last_seen
+            if parsed['program'] == 'dhcpd' and parsed['message']:
+                mac_address = extract_mac_from_dhcp_log(parsed['message'])
+                if mac_address:
+                    update_device_last_seen(db, mac_address)
+
         except Exception as e:
             print(f"[SYSLOG ERROR] Failed to store message: {e}")
             db.rollback()

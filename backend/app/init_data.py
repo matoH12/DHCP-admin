@@ -8,6 +8,7 @@ from app.models.device import Device
 from app.models.user import User
 from app.services.auth_service import create_admin_user_if_not_exists
 from app.config import settings
+from ipaddress import IPv4Network
 import json
 
 
@@ -26,6 +27,33 @@ def init_example_data():
         if not admin:
             print("⚠️  Could not create or find admin user, skipping example data initialization")
             return
+
+        # Check if Docker network range already exists
+        docker_network_range = db.query(IPRange).filter(IPRange.name == "Docker Bridge Network").first()
+        if not docker_network_range:
+            print("📦 Creating Docker bridge network range...")
+
+            # Parse Docker network from settings
+            docker_net = IPv4Network(settings.DOCKER_NETWORK_SUBNET, strict=False)
+
+            # Create Docker network IP range (no DHCP pool, just declaration)
+            docker_network_range = IPRange(
+                name="Docker Bridge Network",
+                network_address=str(docker_net.network_address),
+                cidr=docker_net.prefixlen,
+                gateway=None,  # No gateway needed
+                dns_servers=None,  # No DNS needed
+                domain_name=None,  # No domain needed
+                pool_start=None,  # No dynamic pool
+                pool_end=None,  # No dynamic pool
+                description="Docker internal bridge network (required for DHCP server to start)",
+                is_active=True
+            )
+            db.add(docker_network_range)
+            db.commit()
+            print(f"✅ Docker network '{docker_net}' created in database")
+        else:
+            print(f"ℹ️  Docker network already exists: {docker_network_range.name}")
 
         # Check if example network already exists
         existing_range = db.query(IPRange).filter(IPRange.name == "Example Office Network").first()

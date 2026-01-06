@@ -67,6 +67,7 @@ def get_setting(
     return setting
 
 
+@router.put("/{key}/", response_model=Setting)
 @router.put("/{key}", response_model=Setting)
 def update_setting(
     key: str,

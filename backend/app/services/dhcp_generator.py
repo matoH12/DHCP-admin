@@ -47,6 +47,14 @@ def generate_dhcpd_conf(db: Session) -> str:
     output.append("allow bootp;")
     output.append("")
 
+    # Add Docker network subnet (required for container to start)
+    output.append("# Docker bridge network (no DHCP service)")
+    output.append("# This subnet declaration is required for the DHCP server to start in Docker")
+    output.append("subnet 192.168.32.0 netmask 255.255.255.0 {")
+    output.append("    # No DHCP service on this network")
+    output.append("}")
+    output.append("")
+
     # Get all active IP ranges
     ip_ranges = db.query(IPRange).filter(IPRange.is_active == True).order_by(IPRange.name).all()
 

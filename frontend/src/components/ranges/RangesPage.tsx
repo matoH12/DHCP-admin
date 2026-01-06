@@ -105,7 +105,7 @@ export function RangesPage() {
       title: 'DNS',
       dataIndex: 'dns_servers',
       key: 'dns_servers',
-      render: (dns: string[]) => dns.join(', '),
+      render: (dns: string[] | null) => dns ? dns.join(', ') : '-',
     },
     {
       title: 'Doména',

@@ -42,7 +42,7 @@ def init_example_data():
                 name="Docker Bridge Network",
                 network_address=str(docker_net.network_address),
                 cidr=docker_net.prefixlen,
-                gateway=None,  # No gateway needed
+                gateway=str(list(docker_net.hosts())[0]),  # First host as gateway (Docker default)
                 dns_servers=None,  # No DNS needed
                 domain_name=None,  # No domain needed
                 pool_start=None,  # No dynamic pool

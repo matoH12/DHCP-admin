@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # DHCP Configuration
     DHCP_CONFIG_PATH: str = "/dhcp-config/dhcpd.conf"
+    DOCKER_NETWORK_SUBNET: str = "172.18.0.0/16"  # Docker bridge network CIDR
 
     # Admin User (created on first run)
     ADMIN_USERNAME: str = "admin"

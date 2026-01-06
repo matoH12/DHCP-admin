@@ -25,6 +25,7 @@ services:
 
       # DHCP Configuration
       - DHCP_CONFIG_PATH=/dhcp-config/dhcpd.conf
+      - DOCKER_NETWORK_SUBNET=${DOCKER_NETWORK_SUBNET:-172.18.0.0/16}
 
       # Admin User (CHANGE THESE IN PRODUCTION!)
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}

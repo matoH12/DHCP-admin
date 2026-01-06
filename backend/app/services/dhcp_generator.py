@@ -48,9 +48,11 @@ def generate_dhcpd_conf(db: Session) -> str:
     output.append("")
 
     # Add Docker network subnet (required for container to start)
+    # Parse the Docker network from settings
+    docker_network = IPv4Network(settings.DOCKER_NETWORK_SUBNET, strict=False)
     output.append("# Docker bridge network (no DHCP service)")
     output.append("# This subnet declaration is required for the DHCP server to start in Docker")
-    output.append("subnet 192.168.32.0 netmask 255.255.255.0 {")
+    output.append(f"subnet {docker_network.network_address} netmask {docker_network.netmask} {{")
     output.append("    # No DHCP service on this network")
     output.append("}")
     output.append("")

@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { PendingChangesBanner } from './PendingChangesBanner';
 import type { MenuProps } from 'antd';
 
 const { Header, Sider, Content } = Layout;
@@ -130,6 +131,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </Dropdown>
         </Header>
         <Content style={{ margin: '24px 16px', padding: 24, background: '#fff', minHeight: 280 }}>
+          <PendingChangesBanner />
           {children}
         </Content>
       </Layout>

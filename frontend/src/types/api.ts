@@ -179,3 +179,18 @@ export interface Setting {
 export interface SettingUpdate {
   value: string;
 }
+
+export interface DHCPStatus {
+  pending_changes: boolean;
+  active_config_version: number | null;
+  active_config_generated_at: string | null;
+}
+
+export interface DHCPActivateResponse {
+  success: boolean;
+  message: string;
+  version: number;
+  file_path: string;
+  generated_at: string;
+  restart_status: string;
+}

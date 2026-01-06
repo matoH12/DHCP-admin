@@ -44,6 +44,9 @@ services:
       # DHCP logs (shared with dhcp-server)
       - ./dhcp-logs:/var/log/dhcp
 
+      # Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+
       # For production, you might want to mount directly to /etc/dhcp:
       # - /etc/dhcp:/dhcp-config
 

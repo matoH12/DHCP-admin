@@ -8,6 +8,7 @@ from ..models.ip_range import IPRange
 from ..models.device import Device
 from ..utils.ip_utils import calculate_range_statistics
 from ..utils.validators import validate_network_address
+from .settings_service import set_pending_changes
 
 
 def get_ip_ranges(db: Session, skip: int = 0, limit: int = 100) -> List[IPRange]:
@@ -76,6 +77,7 @@ def create_ip_range(
     db.add(ip_range)
     db.commit()
     db.refresh(ip_range)
+    set_pending_changes(db, True)
     return ip_range
 
 
@@ -109,6 +111,7 @@ def update_ip_range(
 
     db.commit()
     db.refresh(ip_range)
+    set_pending_changes(db, True)
     return ip_range
 
 
@@ -129,6 +132,7 @@ def delete_ip_range(db: Session, range_id: int) -> bool:
 
     db.delete(ip_range)
     db.commit()
+    set_pending_changes(db, True)
     return True
 
 

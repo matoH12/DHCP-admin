@@ -8,6 +8,7 @@ from ..models.device import Device
 from ..models.ip_range import IPRange
 from ..utils.validators import validate_ip_in_range, normalize_mac_address
 from ..utils.ip_utils import suggest_next_ip
+from .settings_service import set_pending_changes
 
 
 def get_devices(
@@ -150,6 +151,7 @@ def create_device(
     db.add(device)
     db.commit()
     db.refresh(device)
+    set_pending_changes(db, True)
     return device
 
 
@@ -217,6 +219,7 @@ def update_device(
 
     db.commit()
     db.refresh(device)
+    set_pending_changes(db, True)
     return device
 
 
@@ -237,6 +240,7 @@ def delete_device(db: Session, device_id: int) -> bool:
 
     db.delete(device)
     db.commit()
+    set_pending_changes(db, True)
     return True
 
 

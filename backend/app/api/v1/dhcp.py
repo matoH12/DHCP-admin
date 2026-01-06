@@ -5,11 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 from typing import List
+import logging
 from ...database import get_db
 from ...dependencies import get_current_user
 from ...schemas.dhcp_config import DHCPConfig, DHCPConfigSummary, DHCPGenerateResponse
 from ...services import dhcp_generator
+from ...services.settings_service import set_pending_changes, has_pending_changes
+from ...utils.docker_utils import restart_dhcp_container
 from ...models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dhcp", tags=["DHCP Configuration"])
 
@@ -174,6 +179,100 @@ def get_config_history(
         })
 
     return summaries
+
+
+@router.get("/status", response_model=dict)
+def get_dhcp_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get DHCP configuration status including pending changes flag
+
+    Args:
+        db: Database session
+        current_user: Current authenticated user
+
+    Returns:
+        Status dictionary with pending_changes flag and active config info
+    """
+    pending = has_pending_changes(db)
+    active_config = dhcp_generator.get_active_config(db)
+
+    return {
+        "pending_changes": pending,
+        "active_config_version": active_config.version if active_config else None,
+        "active_config_generated_at": active_config.generated_at if active_config else None
+    }
+
+
+@router.post("/activate", response_model=dict)
+def activate_dhcp_config(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Activate DHCP configuration: Generate config, restart DHCP server, clear pending flag
+    Requires ADMIN role.
+
+    Args:
+        db: Database session
+        current_user: Current authenticated user
+
+    Returns:
+        Activation response with version, file path, and restart status
+
+    Raises:
+        HTTPException: If user is not ADMIN or activation fails
+    """
+    # Check admin permission
+    if current_user.role != 'ADMIN':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can activate DHCP configuration"
+        )
+
+    try:
+        # Step 1: Generate new DHCP configuration
+        content, file_path = dhcp_generator.generate_and_save_config(
+            db,
+            user_id=current_user.id,
+            save_to_db=True
+        )
+
+        active_config = dhcp_generator.get_active_config(db)
+
+        # Step 2: Restart DHCP server container
+        restart_success, restart_msg = restart_dhcp_container()
+
+        if not restart_success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Config generated but DHCP restart failed: {restart_msg}"
+            )
+
+        # Step 3: Clear pending changes flag
+        set_pending_changes(db, False)
+
+        logger.info(f"User {current_user.username} activated DHCP config version {active_config.version}")
+
+        return {
+            "success": True,
+            "message": "DHCP configuration activated successfully",
+            "version": active_config.version,
+            "file_path": file_path,
+            "generated_at": active_config.generated_at,
+            "restart_status": restart_msg
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Activation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to activate DHCP configuration: {str(e)}"
+        )
 
 
 @router.get("/{config_id}", response_model=DHCPConfig)

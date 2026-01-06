@@ -37,6 +37,11 @@ def create_default_settings_if_not_exists(db: Session) -> bool:
             'key': 'syslog_cleanup_hour',
             'value': '2',
             'description': 'Hour of day (0-23) when automatic cleanup runs'
+        },
+        {
+            'key': 'pending_changes',
+            'value': 'false',
+            'description': 'Indicates whether DHCP configuration has pending changes'
         }
     ]
 
@@ -96,3 +101,17 @@ def is_syslog_cleanup_enabled(db: Session) -> bool:
 def get_syslog_cleanup_hour(db: Session) -> int:
     """Get hour when syslog cleanup should run"""
     return get_setting_as_int(db, 'syslog_cleanup_hour', default=2)
+
+
+def set_pending_changes(db: Session, value: bool) -> None:
+    """Set pending changes flag"""
+    setting = db.query(Settings).filter(Settings.key == 'pending_changes').first()
+    if setting:
+        setting.value = 'true' if value else 'false'
+        setting.updated_at = datetime.utcnow()
+        db.commit()
+
+
+def has_pending_changes(db: Session) -> bool:
+    """Check if there are pending changes"""
+    return get_setting_as_bool(db, 'pending_changes', default=False)

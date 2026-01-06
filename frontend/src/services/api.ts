@@ -18,7 +18,9 @@ import type {
   SyslogMessage,
   SyslogStats,
   Setting,
-  SettingUpdate
+  SettingUpdate,
+  DHCPStatus,
+  DHCPActivateResponse
 } from '../types/api';
 
 class ApiService {
@@ -161,6 +163,16 @@ class ApiService {
 
   async getDHCPHistory(): Promise<DHCPConfig[]> {
     const response = await this.api.get<DHCPConfig[]>('/dhcp/history');
+    return response.data;
+  }
+
+  async getDHCPStatus(): Promise<DHCPStatus> {
+    const response = await this.api.get<DHCPStatus>('/dhcp/status');
+    return response.data;
+  }
+
+  async activateDHCPConfig(): Promise<DHCPActivateResponse> {
+    const response = await this.api.post<DHCPActivateResponse>('/dhcp/activate');
     return response.data;
   }
 

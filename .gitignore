@@ -72,6 +72,9 @@ docker-compose.override.yml
 dhcp-config/*.conf
 dhcp-config/*.leases
 
+# DHCP leases (runtime data)
+dhcp-leases/*.leases
+
 # Claude Code
 .claude/
 

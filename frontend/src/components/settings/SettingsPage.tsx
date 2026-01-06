@@ -10,8 +10,10 @@ import {
   Divider,
   Space,
   Alert,
+  Row,
+  Col,
 } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
+import { SaveOutlined, ApiOutlined, FileTextOutlined } from '@ant-design/icons';
 import { apiService } from '../../services/api';
 import type { Setting } from '../../types/api';
 
@@ -98,9 +100,150 @@ export function SettingsPage() {
     return `${days} dní`;
   };
 
+  const openSwaggerDocs = () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      message.error('Nie ste prihlásený');
+      return;
+    }
+
+    // Open Swagger UI in new window with token in Authorization header
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const docsUrl = `${backendUrl}/api/docs`;
+
+    // Create a form to POST the request with Authorization header
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = docsUrl;
+    form.target = '_blank';
+
+    // We'll use a different approach - open in new window and set headers via fetch
+    const newWindow = window.open('about:blank', '_blank');
+    if (newWindow) {
+      fetch(docsUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+        .then(response => response.text())
+        .then(html => {
+          if (newWindow) {
+            newWindow.document.write(html);
+            newWindow.document.close();
+          }
+        })
+        .catch(() => {
+          message.error('Nepodarilo sa otvoriť Swagger dokumentáciu');
+          if (newWindow) newWindow.close();
+        });
+    }
+  };
+
+  const openRedocDocs = () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      message.error('Nie ste prihlásený');
+      return;
+    }
+
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const redocUrl = `${backendUrl}/api/redoc`;
+
+    const newWindow = window.open('about:blank', '_blank');
+    if (newWindow) {
+      fetch(redocUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+        .then(response => response.text())
+        .then(html => {
+          if (newWindow) {
+            newWindow.document.write(html);
+            newWindow.document.close();
+          }
+        })
+        .catch(() => {
+          message.error('Nepodarilo sa otvoriť ReDoc dokumentáciu');
+          if (newWindow) newWindow.close();
+        });
+    }
+  };
+
   return (
     <div>
       <Title level={2}>Nastavenia</Title>
+
+      <Card
+        title="API Dokumentácia"
+        style={{ maxWidth: 800, marginBottom: 24 }}
+      >
+        <Alert
+          message="Interaktívna API dokumentácia"
+          description="Prístup k Swagger UI a ReDoc dokumentácii pre REST API endpointy. Dokumentácia je chránená prihlásením a automaticky obsahuje váš autentifikačný token."
+          type="info"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+
+        <Row gutter={16}>
+          <Col xs={24} sm={12}>
+            <Card
+              hoverable
+              onClick={openSwaggerDocs}
+              style={{ cursor: 'pointer', textAlign: 'center' }}
+            >
+              <ApiOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
+              <Title level={4}>Swagger UI</Title>
+              <Paragraph type="secondary">
+                Interaktívna dokumentácia s možnosťou testovať API endpointy priamo v prehliadači
+              </Paragraph>
+              <Button type="primary" icon={<ApiOutlined />}>
+                Otvoriť Swagger
+              </Button>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={12}>
+            <Card
+              hoverable
+              onClick={openRedocDocs}
+              style={{ cursor: 'pointer', textAlign: 'center' }}
+            >
+              <FileTextOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
+              <Title level={4}>ReDoc</Title>
+              <Paragraph type="secondary">
+                Prehľadná a čitateľná dokumentácia API s lepšou navigáciou a vyhľadávaním
+              </Paragraph>
+              <Button type="primary" icon={<FileTextOutlined />} style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}>
+                Otvoriť ReDoc
+              </Button>
+            </Card>
+          </Col>
+        </Row>
+
+        <Divider />
+
+        <div>
+          <Title level={5}>Informácie</Title>
+          <Paragraph>
+            <ul>
+              <li>
+                <strong>Swagger UI:</strong> Ideálne pre testovanie API - obsahuje formuláre pre zadávanie parametrov
+              </li>
+              <li>
+                <strong>ReDoc:</strong> Lepšie pre čítanie dokumentácie - prehľadnejšia štruktúra a navigácia
+              </li>
+              <li>
+                <strong>Autentifikácia:</strong> Dokumentácia sa otvorí s vaším JWT tokenom automaticky nakonfigurovaným
+              </li>
+              <li>
+                <strong>Bezpečnosť:</strong> Prístup k dokumentácii je chránený - vyžaduje platné prihlásenie
+              </li>
+            </ul>
+          </Paragraph>
+        </div>
+      </Card>
 
       <Card
         title="Syslog - Automatické čistenie"

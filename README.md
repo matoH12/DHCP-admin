@@ -97,8 +97,8 @@ docker compose up -d
 
 3. **Access the application**
 - Frontend: http://localhost:3003
-- Backend API: http://localhost:8002
-- API Docs: http://localhost:8002/docs
+- Backend API: Not exposed externally (security hardening)
+- API accessible via frontend proxy at http://localhost:3003/api
 
 4. **Default credentials**
 ```
@@ -131,6 +131,23 @@ docker compose logs backend | grep "Admin user"
 You should see: `✓ Admin user 'admin' ready`
 
 Now login with the credentials above.
+
+### 📁 Directory Structure
+
+The application automatically creates these directories on first clone (tracked via `.gitkeep`):
+
+```
+dhcp-admin/
+├── data/              # SQLite database (auto-created on first run)
+├── dhcp-config/       # Generated DHCP configuration files
+├── dhcp-logs/         # DHCP server logs (viewable in web UI)
+├── dhcp-leases/       # DHCP lease database
+├── backend/           # FastAPI backend application
+├── frontend/          # React frontend application
+└── dhcp-server/       # ISC DHCP server container config
+```
+
+**No manual directory creation needed!** All directories are automatically created when you clone the repository.
 
 ### Option 2: Production Deployment
 

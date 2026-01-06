@@ -31,6 +31,7 @@ interface LogLine {
   line_number: number;
   content: string;
   timestamp: string | null;
+  event_type: string | null;
 }
 
 interface DHCPLogsResponse {
@@ -42,20 +43,24 @@ interface DHCPLogsResponse {
   };
   log_file: string;
   order: string;
+  event_type: string | null;
 }
+
+type EventType = 'DISCOVER' | 'OFFER' | 'REQUEST' | 'ACK' | 'NAK' | 'RELEASE' | 'INFORM' | 'DECLINE' | null;
 
 export function LogsPage() {
   const [logsData, setLogsData] = useState<DHCPLogsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [eventTypeFilter, setEventTypeFilter] = useState<EventType>(null);
 
   useEffect(() => {
     loadLogs();
     // Auto-refresh every 15 seconds
     const interval = setInterval(loadLogs, 15000);
     return () => clearInterval(interval);
-  }, [searchTerm, sortOrder]);
+  }, [searchTerm, sortOrder, eventTypeFilter]);
 
   const loadLogs = async () => {
     setLoading(true);
@@ -64,6 +69,7 @@ export function LogsPage() {
         lines: 500,
         ...(searchTerm && { search: searchTerm }),
         order: sortOrder,
+        ...(eventTypeFilter && { event_type: eventTypeFilter }),
       });
       setLogsData(data);
     } catch (error) {
@@ -194,8 +200,25 @@ export function LogsPage() {
               allowClear
               enterButton={<SearchOutlined />}
               onSearch={handleSearch}
-              style={{ width: 400 }}
+              style={{ width: 300 }}
             />
+
+            <Select
+              value={eventTypeFilter}
+              onChange={setEventTypeFilter}
+              placeholder="Typ DHCP udalosti"
+              allowClear
+              style={{ width: 200 }}
+            >
+              <Select.Option value="DISCOVER">🔍 DISCOVER</Select.Option>
+              <Select.Option value="OFFER">💡 OFFER</Select.Option>
+              <Select.Option value="REQUEST">📨 REQUEST</Select.Option>
+              <Select.Option value="ACK">✅ ACK</Select.Option>
+              <Select.Option value="NAK">❌ NAK</Select.Option>
+              <Select.Option value="RELEASE">🔓 RELEASE</Select.Option>
+              <Select.Option value="INFORM">ℹ️ INFORM</Select.Option>
+              <Select.Option value="DECLINE">⛔ DECLINE</Select.Option>
+            </Select>
 
             <Select
               value={sortOrder}

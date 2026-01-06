@@ -14,7 +14,7 @@ router = APIRouter(prefix="/logs", tags=["Logs"])
 DHCP_LOG_DIR = "/var/log/dhcp"
 
 
-def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None, order: str = "desc") -> List[dict]:
+def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None, order: str = "desc", event_type: Optional[str] = None) -> List[dict]:
     """
     Read last N lines from log file
 
@@ -23,6 +23,7 @@ def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None
         lines: Number of lines to read from end
         search: Optional search filter
         order: Sort order - "desc" for newest first (default), "asc" for oldest first
+        event_type: Optional DHCP event type filter (DISCOVER, OFFER, REQUEST, ACK, NAK, RELEASE, INFORM, DECLINE)
 
     Returns:
         List of log line dictionaries
@@ -48,10 +49,18 @@ def read_log_file(file_path: str, lines: int = 100, search: Optional[str] = None
             if not line:
                 continue
 
+            # Extract event type for filtering
+            line_event_type = extract_dhcp_event_type(line)
+
+            # Filter by event type if specified
+            if event_type and line_event_type != event_type:
+                continue
+
             result.append({
                 "line_number": len(all_lines) - len(last_lines) + idx + 1,
                 "content": line,
-                "timestamp": extract_timestamp(line)
+                "timestamp": extract_timestamp(line),
+                "event_type": line_event_type
             })
 
         # Sort by order (desc = newest first, asc = oldest first)
@@ -79,11 +88,30 @@ def extract_timestamp(log_line: str) -> Optional[str]:
     return None
 
 
+def extract_dhcp_event_type(log_line: str) -> Optional[str]:
+    """
+    Extract DHCP event type from log line
+
+    Returns: DISCOVER, OFFER, REQUEST, ACK, NAK, RELEASE, INFORM, or None
+    """
+    dhcp_events = ['DHCPDISCOVER', 'DHCPOFFER', 'DHCPREQUEST', 'DHCPACK',
+                   'DHCPNAK', 'DHCPRELEASE', 'DHCPINFORM', 'DHCPDECLINE']
+
+    line_upper = log_line.upper()
+    for event in dhcp_events:
+        if event in line_upper:
+            # Return without DHCP prefix (e.g., "DISCOVER" instead of "DHCPDISCOVER")
+            return event.replace('DHCP', '')
+
+    return None
+
+
 @router.get("/dhcp", response_model=dict)
 def get_dhcp_logs(
     lines: int = Query(100, le=1000, description="Number of recent lines to retrieve"),
     search: Optional[str] = Query(None, description="Search term to filter logs"),
     order: str = Query("desc", regex="^(asc|desc)$", description="Sort order: 'desc' for newest first, 'asc' for oldest first"),
+    event_type: Optional[str] = Query(None, regex="^(DISCOVER|OFFER|REQUEST|ACK|NAK|RELEASE|INFORM|DECLINE)$", description="Filter by DHCP event type"),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -93,6 +121,7 @@ def get_dhcp_logs(
         lines: Number of recent lines to retrieve (max 1000)
         search: Optional search filter
         order: Sort order - "desc" for newest first (default), "asc" for oldest first
+        event_type: Optional DHCP event type filter (DISCOVER, OFFER, REQUEST, ACK, NAK, RELEASE, INFORM, DECLINE)
         current_user: Current authenticated user
 
     Returns:
@@ -100,7 +129,7 @@ def get_dhcp_logs(
     """
     dhcpd_log = os.path.join(DHCP_LOG_DIR, "dhcpd.log")
 
-    log_lines = read_log_file(dhcpd_log, lines=lines, search=search, order=order)
+    log_lines = read_log_file(dhcpd_log, lines=lines, search=search, order=order, event_type=event_type)
 
     # Get file size and modification time
     file_info = {}
@@ -116,7 +145,8 @@ def get_dhcp_logs(
         "total_lines": len(log_lines),
         "file_info": file_info,
         "log_file": "dhcpd.log",
-        "order": order
+        "order": order,
+        "event_type": event_type
     }
 
 

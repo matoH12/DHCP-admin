@@ -309,6 +309,7 @@ class ApiService {
     lines?: number;
     search?: string;
     order?: 'asc' | 'desc';
+    event_type?: 'DISCOVER' | 'OFFER' | 'REQUEST' | 'ACK' | 'NAK' | 'RELEASE' | 'INFORM' | 'DECLINE';
   }): Promise<any> {
     const response = await this.api.get('/logs/dhcp', { params });
     return response.data;

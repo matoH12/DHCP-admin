@@ -21,7 +21,7 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
 
       # CORS
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3002,http://localhost:80}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:80}
 
       # DHCP Configuration
       - DHCP_CONFIG_PATH=/dhcp-config/dhcpd.conf

@@ -96,7 +96,7 @@ docker compose up -d
 ```
 
 3. **Access the application**
-- Frontend: http://localhost:3002
+- Frontend: http://localhost:3003
 - Backend API: http://localhost:8002
 - API Docs: http://localhost:8002/docs
 
@@ -106,6 +106,31 @@ Username: admin
 Password: AdminDHCP2026!
 Email: admin@example.com
 ```
+
+### 🔄 Database Reset (If Login Fails)
+
+If you're getting 401 Unauthorized errors when trying to login, you may need to reset the database:
+
+```bash
+# 1. Stop containers
+docker compose down
+
+# 2. Delete old database
+rm -f data/dhcp-admin.db
+
+# 3. Start fresh (creates new database with current password)
+docker compose up -d
+
+# 4. Wait for initialization
+sleep 10
+
+# 5. Verify admin user was created
+docker compose logs backend | grep "Admin user"
+```
+
+You should see: `✓ Admin user 'admin' ready`
+
+Now login with the credentials above.
 
 ### Option 2: Production Deployment
 
@@ -187,7 +212,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 docker compose up -d
 ```
 
-Access: http://localhost:3002
+Access: http://localhost:3003
 
 ## 📚 API Documentation
 
@@ -322,7 +347,7 @@ SECRET_KEY=your-secret-key-here-min-32-chars
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # CORS
-CORS_ORIGINS=http://localhost:3000,http://localhost:3002
+CORS_ORIGINS=http://localhost:3000,http://localhost:3003
 
 # DHCP Configuration
 DHCP_CONFIG_PATH=/dhcp-config/dhcpd.conf

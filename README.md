@@ -8,6 +8,12 @@ A modern web-based management interface for ISC DHCP Server with authentication,
 ![React](https://img.shields.io/badge/React-18+-blue.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 
+## 🎥 Application Preview
+
+![DHCP Admin Application Demo](DHCP_Admin_Presentation.gif)
+
+*Interactive demonstration of the DHCP Admin interface showcasing device management, IP range configuration, analytics dashboard, and real-time log monitoring.*
+
 ## ✨ Features
 
 ### Core Functionality
